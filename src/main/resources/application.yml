@@ -1,0 +1,49 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: pixel
+
+  # MySQL 数据库配置 (启用时取消注释)
+  # datasource:
+  #   url: jdbc:mysql://localhost:3306/pixel?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+  #   username: root
+  #   password: ${MYSQL_PASSWORD:123456}
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Redis 缓存配置 (启用时取消注释)
+  # data:
+  #   redis:
+  #     host: ${REDIS_HOST:localhost}
+  #     port: ${REDIS_PORT:6379}
+  #     password: ${REDIS_PASSWORD:}
+  #     database: 0
+
+  # Spring AI - OpenAI 兼容配置 (支持多厂商)
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-xxx}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      image:
+        options:
+          model: dall-e-3
+          size: 1024x1024
+          quality: standard
+
+# Nacos 配置 (可选，用于动态配置)
+spring.cloud.nacos.discovery.enabled: false
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.wwt.pixel.adapter.persistence.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.wwt.pixel: DEBUG
+    org.springframework.ai: DEBUG
