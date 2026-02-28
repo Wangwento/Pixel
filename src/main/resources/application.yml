@@ -20,7 +20,7 @@ spring:
   #     password: ${REDIS_PASSWORD:}
   #     database: 0
 
-  # Spring AI - OpenAI 兼容配置 (支持多厂商)
+  # Spring AI - OpenAI 配置 (作为默认适配器)
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:sk-xxx}
@@ -30,6 +30,82 @@ spring:
           model: dall-e-3
           size: 1024x1024
           quality: standard
+  profiles:
+    active: dev
+
+# ========== Pixel AI 多厂商配置 ==========
+pixel:
+  ai:
+    # 调度策略: round-robin(轮询), weighted(加权), random(随机)
+    strategy: ${AI_STRATEGY:round-robin}
+    # 失败降级开关
+    fallback-enabled: true
+
+    # OpenAI / DALL-E 配置
+    openai:
+      enabled: ${OPENAI_ENABLED:true}
+      weight: 1
+      timeout: 60000
+
+    # Google Gemini 配置
+    gemini:
+      enabled: ${GEMINI_ENABLED:false}
+      api-key: ${GEMINI_API_KEY:}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+      model: ${GEMINI_MODEL:gemini-2.0-flash-exp-image-generation}
+      weight: 2
+      timeout: 60000
+
+    # 腾讯混元配置
+    hunyuan:
+      enabled: ${HUNYUAN_ENABLED:false}
+      secret-id: ${HUNYUAN_SECRET_ID:}
+      secret-key: ${HUNYUAN_SECRET_KEY:sk-P0aDbWb5Va1V2F6u8bJD8mxVRDvgbXTq1NdYLffLLuLdezqg}
+      region: ${HUNYUAN_REGION:ap-guangzhou}
+      weight: 3
+      timeout: 60000
+
+    # ========== OpenAI兼容厂商列表 (可配置多个) ==========
+    vendors:
+      # 京东云灵境
+      - code: jingdong
+        name: 京东云灵境
+        enabled: ${JINGDONG_ENABLED:false}
+        api-key: ${JINGDONG_API_KEY:sk-tqhff4pioby6vqbqt0hfim15y2m5shkr}
+        base-url: ${JINGDONG_BASE_URL:https://api.jdcloud.com}
+        model: ${JINGDONG_MODEL:dall-e-3}
+        weight: 2
+        timeout: 60000
+
+      # Nano Banana
+      - code: nano-banana
+        name: Nano Banana
+        enabled: ${NANO_BANANA_ENABLED:false}
+        api-key: ${NANO_BANANA_API_KEY:}
+        base-url: ${NANO_BANANA_BASE_URL:}
+        model: ${NANO_BANANA_MODEL:dall-e-3}
+        weight: 2
+        timeout: 60000
+
+      # 一步API (yibuapi.com)
+      - code: yibu
+        name: 一步API
+        enabled: ${YIBU_ENABLED:false}
+        api-key: ${YIBU_API_KEY:}
+        base-url: ${YIBU_BASE_URL:https://api.yibuapi.com}
+        model: ${YIBU_MODEL:dall-e-3}
+        weight: 2
+        timeout: 60000
+
+      # 智谱AI
+      - code: zhipu
+        name: 智谱AI
+        enabled: ${ZHIPU_ENABLED:false}
+        api-key: ${ZHIPU_API_KEY:}
+        base-url: ${ZHIPU_BASE_URL:https://open.bigmodel.cn}
+        model: ${ZHIPU_MODEL:cogview-3}
+        weight: 2
+        timeout: 60000
 
 # Nacos 配置 (可选，用于动态配置)
 spring.cloud.nacos.discovery.enabled: false
