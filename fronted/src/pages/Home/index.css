@@ -1,0 +1,308 @@
+.home-fullscreen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+
+/* 模糊海报过渡层 */
+.blur-poster {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  background: inherit;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.blur-poster.visible {
+  opacity: 1;
+}
+
+/* 视频容器 */
+.video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.bg-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  z-index: 0;
+  transition: none;
+}
+
+.bg-video.active {
+  opacity: 1;
+  z-index: 1;
+}
+
+/* ========== 过渡效果 1: 交叉淡入淡出 ========== */
+.bg-video.transition-crossfade {
+  transition: opacity 1.2s ease-in-out;
+}
+
+.bg-video.transition-crossfade.active {
+  opacity: 1;
+}
+
+/* ========== 过渡效果 2: 模糊过渡 ========== */
+.bg-video.transition-blur {
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+
+.bg-video.transition-blur:not(.active) {
+  filter: blur(20px);
+}
+
+.bg-video.transition-blur.active {
+  filter: blur(0);
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+  pointer-events: none;
+}
+
+/* 左上角 Logo */
+.home-header {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.header-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+}
+
+/* 右上角登录/注册 */
+.home-auth {
+  position: absolute;
+  top: 24px;
+  right: 32px;
+  z-index: 20;
+}
+
+.auth-button {
+  color: #fff !important;
+  font-size: 15px;
+  padding: 8px 20px !important;
+  height: auto !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  transition: all 0.3s ease !important;
+}
+
+.auth-button:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* 主要内容区域 */
+.home-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  padding: 0 20px;
+  padding-bottom: 120px;
+}
+
+/* 标题文字 */
+.hero-text {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.slogan {
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  letter-spacing: 4px;
+}
+
+/* 输入区域 */
+.input-section {
+  width: 100%;
+  max-width: 860px;
+}
+
+.input-wrapper {
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 50px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.prompt-input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 15px;
+  padding-left: 20px !important;
+  height: 40px !important;
+}
+
+.prompt-input input {
+  background: transparent !important;
+  color: #fff !important;
+  font-size: 15px;
+  height: 40px !important;
+  line-height: 40px !important;
+}
+
+.prompt-input input::placeholder {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.prompt-input:focus,
+.prompt-input:hover {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.start-button {
+  border-radius: 40px !important;
+  padding: 0 28px !important;
+  height: 40px !important;
+  font-size: 15px !important;
+  font-weight: 500;
+  background: #fff !important;
+  color: #333 !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.3s ease !important;
+}
+
+.start-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
+  background: #f5f5f5 !important;
+}
+
+/* 底部滚动提示 */
+.scroll-hint {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  animation: bounce 2s infinite;
+  z-index: 10;
+}
+
+.scroll-arrow {
+  width: 24px;
+  height: 24px;
+  border-right: 2px solid rgba(255, 255, 255, 0.7);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+  transform: rotate(45deg);
+  margin-top: 8px;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  40% {
+    transform: translateX(-50%) translateY(-10px);
+  }
+  60% {
+    transform: translateX(-50%) translateY(-5px);
+  }
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 42px;
+  }
+
+  .sub-title {
+    font-size: 16px;
+  }
+
+  .input-wrapper {
+    flex-direction: column;
+    border-radius: 20px;
+    padding: 12px;
+  }
+
+  .prompt-input {
+    padding-left: 12px !important;
+  }
+
+  .start-button {
+    width: 100%;
+    border-radius: 30px !important;
+  }
+
+  .video-indicators {
+    margin-top: 40px;
+  }
+
+  .indicator {
+    width: 30px;
+  }
+
+  .indicator.active {
+    width: 45px;
+  }
+}

@@ -1,0 +1,39 @@
+.history-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.history-card {
+  min-height: 600px;
+}
+
+.history-item {
+  height: 100%;
+}
+
+.history-image {
+  height: 200px;
+  object-fit: cover;
+}
+
+.item-info {
+  font-size: 12px;
+}
+
+.item-info .prompt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.item-info .time {
+  color: #999;
+  margin: 0;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
