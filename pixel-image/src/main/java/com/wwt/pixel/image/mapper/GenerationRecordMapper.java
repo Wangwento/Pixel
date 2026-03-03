@@ -3,6 +3,8 @@ package com.wwt.pixel.image.mapper;
 import com.wwt.pixel.image.domain.GenerationRecord;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 /**
  * 生成记录Mapper
  */
@@ -21,4 +23,28 @@ public interface GenerationRecordMapper {
 
     @Select("SELECT * FROM generation_record WHERE id = #{id}")
     GenerationRecord findById(Long id);
+
+    @Select("SELECT * FROM generation_record WHERE user_id = #{userId} AND status = 1 " +
+            "ORDER BY created_at DESC LIMIT #{offset}, #{limit}")
+    List<GenerationRecord> findByUserIdWithPaging(@Param("userId") Long userId,
+                                                   @Param("offset") int offset,
+                                                   @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM generation_record WHERE user_id = #{userId} AND status = 1")
+    int countByUserId(@Param("userId") Long userId);
+
+    @Select("SELECT * FROM generation_record WHERE user_id = #{userId} AND status = 1 " +
+            "AND created_at BETWEEN #{startDate} AND #{endDate} " +
+            "ORDER BY created_at DESC LIMIT #{offset}, #{limit}")
+    List<GenerationRecord> findByUserIdAndDateRange(@Param("userId") Long userId,
+                                                     @Param("startDate") String startDate,
+                                                     @Param("endDate") String endDate,
+                                                     @Param("offset") int offset,
+                                                     @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM generation_record WHERE user_id = #{userId} AND status = 1 " +
+            "AND created_at BETWEEN #{startDate} AND #{endDate}")
+    int countByUserIdAndDateRange(@Param("userId") Long userId,
+                                   @Param("startDate") String startDate,
+                                   @Param("endDate") String endDate);
 }

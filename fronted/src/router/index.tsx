@@ -7,6 +7,7 @@ import History from '../pages/History';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import DashboardGenerate from '../pages/Dashboard/Generate';
+import Assets from '../pages/Assets';
 
 // 路由守卫组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -60,6 +61,10 @@ const router = createBrowserRouter([
       {
         path: 'history',
         element: <History />,
+      },
+      {
+        path: 'assets',
+        element: <Assets />,
       },
     ],
   },
