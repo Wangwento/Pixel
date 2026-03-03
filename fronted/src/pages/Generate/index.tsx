@@ -21,7 +21,8 @@ import {
 } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd';
 import { useSearchParams } from 'react-router-dom';
-import { generateImage, imageToImage } from '../../api/image';
+import { text2img, img2img } from '../../api/image';
+import type { GenerationResult, Text2ImgRequest, Img2ImgRequest } from '../../api/image';
 import './index.css';
 
 const { TextArea } = Input;
@@ -65,15 +66,21 @@ const Generate: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await generateImage({ prompt, style });
-      if (response.code === 200) {
-        setGeneratedImage(response.data.imageUrl);
+      const requestParams: Text2ImgRequest = {
+        prompt: prompt.trim(),
+        style: style,
+      };
+
+      const response = await text2img(requestParams) as unknown as { code: number; data: GenerationResult; message?: string };
+      if (response.code === 200 && response.data) {
+        setGeneratedImage(response.data.ossUrl || response.data.imageUrl || '');
         message.success('图片生成成功！');
       } else {
         message.error(response.message || '生成失败');
       }
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '生成失败，请稍后重试');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || '生成失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -92,19 +99,31 @@ const Generate: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await imageToImage({
-        prompt,
-        imageFile: fileList[0].originFileObj as File,
-        style,
+      // 将图片转为 base64
+      const file = fileList[0].originFileObj as File;
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-      if (response.code === 200) {
-        setGeneratedImage(response.data.imageUrl);
+
+      const requestParams: Img2ImgRequest = {
+        prompt: prompt.trim(),
+        style: style,
+        sourceImageBase64: base64,
+      };
+
+      const response = await img2img(requestParams) as unknown as { code: number; data: GenerationResult; message?: string };
+      if (response.code === 200 && response.data) {
+        setGeneratedImage(response.data.ossUrl || response.data.imageUrl || '');
         message.success('图片生成成功！');
       } else {
         message.error(response.message || '生成失败');
       }
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '生成失败，请稍后重试');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || '生成失败，请稍后重试');
     } finally {
       setLoading(false);
     }

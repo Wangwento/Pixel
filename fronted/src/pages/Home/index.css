@@ -140,6 +140,82 @@
   border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
+/* 用户信息 */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.user-info:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.user-avatar {
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-nickname {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vip-badge {
+  color: #ffd700;
+  font-size: 14px;
+  margin-left: -4px;
+  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.5));
+}
+
+/* 用户下拉菜单 */
+.user-dropdown {
+  min-width: 160px;
+}
+
+.user-dropdown .ant-dropdown-menu {
+  background: rgba(20, 25, 35, 0.95) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 179, 237, 0.2);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.user-dropdown .ant-dropdown-menu-item {
+  color: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 2px 0;
+  transition: all 0.2s ease;
+}
+
+.user-dropdown .ant-dropdown-menu-item:hover {
+  background: rgba(99, 179, 237, 0.15) !important;
+  color: #63b3ed !important;
+}
+
+.user-dropdown .ant-dropdown-menu-item .anticon {
+  margin-right: 10px;
+  font-size: 15px;
+}
+
+.user-dropdown .ant-dropdown-menu-item-divider {
+  background: rgba(99, 179, 237, 0.15) !important;
+  margin: 8px 0;
+}
+
 /* 主要内容区域 */
 .home-content {
   position: relative;

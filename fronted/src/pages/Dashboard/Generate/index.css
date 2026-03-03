@@ -1,0 +1,454 @@
+/* 生成页面 */
+.generate-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.generate-header {
+  margin-bottom: 32px;
+}
+
+.generate-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.generate-header h1 .anticon {
+  color: #63b3ed;
+}
+
+.generate-header p {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 输入卡片 */
+.input-card {
+  background: rgba(22, 27, 34, 0.8) !important;
+  border: 1px solid rgba(99, 179, 237, 0.15) !important;
+  border-radius: 16px !important;
+}
+
+.input-card .ant-card-body {
+  padding: 24px;
+}
+
+.input-card .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+
+.input-card .ant-tabs-tab {
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 15px;
+}
+
+.input-card .ant-tabs-tab:hover {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.input-card .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #63b3ed !important;
+}
+
+.input-card .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #63b3ed, #81e6d9) !important;
+}
+
+.input-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prompt-textarea {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(99, 179, 237, 0.2) !important;
+  border-radius: 12px !important;
+  color: #fff !important;
+  font-size: 14px;
+  resize: none;
+}
+
+.prompt-textarea:focus {
+  border-color: #63b3ed !important;
+  box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.15) !important;
+}
+
+.prompt-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.prompt-count {
+  text-align: right;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  margin-top: -8px;
+}
+
+/* 模板区域 */
+.template-section h4 {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  margin: 0 0 10px 0;
+}
+
+.template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-tag {
+  padding: 6px 14px;
+  background: rgba(99, 179, 237, 0.1);
+  border: 1px solid rgba(99, 179, 237, 0.2);
+  border-radius: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.template-tag:hover {
+  background: rgba(99, 179, 237, 0.2);
+  border-color: #63b3ed;
+  color: #63b3ed;
+}
+
+.template-tag.selected {
+  background: rgba(99, 179, 237, 0.3);
+  border-color: #63b3ed;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(99, 179, 237, 0.3);
+}
+
+.styles-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+/* 上传区域 */
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  border: 2px dashed rgba(99, 179, 237, 0.3);
+  border-radius: 12px;
+  background: rgba(99, 179, 237, 0.03);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+  border-color: #63b3ed;
+  background: rgba(99, 179, 237, 0.08);
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #63b3ed;
+  margin-bottom: 12px;
+}
+
+.upload-area p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin: 0 0 4px 0;
+}
+
+.upload-area span {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+/* 生成按钮 */
+.generate-btn {
+  height: 48px !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(99, 179, 237, 0.3) !important;
+  margin-top: 8px;
+}
+
+.generate-btn:hover {
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 179, 237, 0.4) !important;
+}
+
+/* 结果卡片 */
+.result-card {
+  background: rgba(22, 27, 34, 0.8) !important;
+  border: 1px solid rgba(99, 179, 237, 0.15) !important;
+  border-radius: 16px !important;
+  min-height: 500px;
+}
+
+.result-card .ant-card-body {
+  padding: 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.result-header h3 {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.result-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.result-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.result-placeholder .anticon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.result-placeholder p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.result-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.result-images img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 179, 237, 0.2);
+}
+
+/* 生成结果图片区域 */
+.result-image-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 模糊占位层 - Gemini 风格 */
+.image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 350px;
+  background: linear-gradient(135deg, rgba(99, 179, 237, 0.1) 0%, rgba(129, 230, 217, 0.05) 100%);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.placeholder-shimmer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.shimmer-icon {
+  font-size: 64px;
+  color: #63b3ed;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.shimmer-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.shimmer-progress {
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, #63b3ed, #81e6d9);
+  border-radius: 2px;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes loading {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* 生成的图片 */
+.generated-image {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(22, 27, 34, 0.5);
+}
+
+.generated-image img {
+  width: 100%;
+  display: block;
+  border-radius: 16px;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 图片工具栏 */
+.image-toolbar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.generated-image:hover .image-toolbar {
+  opacity: 1;
+}
+
+.image-toolbar .ant-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.image-toolbar .ant-btn:hover {
+  background: rgba(99, 179, 237, 0.3) !important;
+  color: #fff !important;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+}
+
+/* 图片信息区域 */
+.image-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* AI 优化后的描述 */
+.revised-prompt {
+  padding: 12px 16px;
+  background: rgba(99, 179, 237, 0.08);
+  border-radius: 10px;
+  border: 1px solid rgba(99, 179, 237, 0.15);
+}
+
+.revised-prompt .label {
+  color: #63b3ed;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.revised-prompt p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  margin: 6px 0 0 0;
+  line-height: 1.6;
+}
+
+/* 图片元信息 */
+.image-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.image-meta span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.image-meta .cache-tag {
+  padding: 2px 8px;
+  background: rgba(129, 230, 217, 0.2);
+  color: #81e6d9;
+  border-radius: 4px;
+}

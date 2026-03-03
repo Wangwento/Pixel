@@ -29,8 +29,12 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
+      // 清除token，让AuthContext处理跳转
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // 只在非登录页面时跳转
+      if (!window.location.pathname.includes('/login') && window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   }

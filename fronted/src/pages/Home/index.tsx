@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Input, Button, message } from 'antd';
+import { Input, Button, message, Dropdown, Avatar } from 'antd';
+import type { MenuProps } from 'antd';
+import {
+  UserOutlined,
+  HistoryOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  CrownOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import LoginModal from '../../components/LoginModal';
+import RegisterModal from '../../components/RegisterModal';
+import { useAuth } from '../../contexts/AuthContext';
 import './index.css';
 
 import video1 from '../../assets/封面1.mp4';
@@ -25,6 +36,9 @@ const Home: React.FC = () => {
   const [transitionType, setTransitionType] = useState<TransitionType>('crossfade');
   const [showBlurPoster, setShowBlurPoster] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const { currentUser, setCurrentUser, logout: authLogout } = useAuth();
   const videoRefs = [useRef<HTMLVideoElement>(null), useRef<HTMLVideoElement>(null)];
   const transitionCountRef = useRef(0);
   const navigate = useNavigate();
@@ -165,11 +179,16 @@ const Home: React.FC = () => {
   };
 
   const handleStart = () => {
-    if (!prompt.trim()) {
-      message.warning('请输入你想生成的头像描述');
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setLoginModalOpen(true);
       return;
     }
-    navigate(`/generate?prompt=${encodeURIComponent(prompt)}`);
+    if (prompt.trim()) {
+      navigate(`/dashboard?prompt=${encodeURIComponent(prompt)}`);
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -201,6 +220,49 @@ const Home: React.FC = () => {
     return classes.join(' ');
   };
 
+  // 退出登录
+  const handleLogout = () => {
+    authLogout();
+    message.success('已退出登录');
+  };
+
+  // 用户下拉菜单
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: '个人中心',
+      onClick: () => navigate('/profile'),
+    },
+    {
+      key: 'history',
+      icon: <HistoryOutlined />,
+      label: '生成历史',
+      onClick: () => navigate('/history'),
+    },
+    {
+      key: 'vip',
+      icon: <CrownOutlined />,
+      label: '会员中心',
+      onClick: () => navigate('/vip'),
+    },
+    {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: '设置',
+      onClick: () => navigate('/settings'),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出登录',
+      onClick: handleLogout,
+    },
+  ];
+
   return (
     <div className="home-fullscreen">
       {/* 左上角 Logo */}
@@ -209,15 +271,39 @@ const Home: React.FC = () => {
         <span className="header-title">像素</span>
       </div>
 
-      {/* 右上角登录/注册 */}
+      {/* 右上角登录/注册 或 用户信息 */}
       <div className="home-auth">
-        <Button
-          type="text"
-          className="auth-button"
-          onClick={() => navigate('/login')}
-        >
-          登录 / 注册
-        </Button>
+        {currentUser ? (
+          <Dropdown
+            menu={{ items: userMenuItems }}
+            placement="bottomRight"
+            trigger={['click']}
+            overlayClassName="user-dropdown"
+          >
+            <div className="user-info">
+              <Avatar
+                src={currentUser.avatar}
+                icon={!<UserOutlined />}
+                size={36}
+                className="user-avatar"
+              />
+              <span className="user-nickname">
+                {currentUser.nickname || currentUser.username}
+              </span>
+              {currentUser.isVip && (
+                <CrownOutlined className="vip-badge" />
+              )}
+            </div>
+          </Dropdown>
+        ) : (
+          <Button
+            type="text"
+            className="auth-button"
+            onClick={() => setLoginModalOpen(true)}
+          >
+            登录 / 注册
+          </Button>
+        )}
       </div>
 
       {/* 模糊海报过渡层 */}
@@ -275,6 +361,40 @@ const Home: React.FC = () => {
         <span>热门头像</span>
         <div className="scroll-arrow" />
       </div>
+
+      {/* 登录弹窗 */}
+      <LoginModal
+        open={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setLoginModalOpen(false);
+          message.success('登录成功');
+        }}
+        onRegister={() => {
+          setLoginModalOpen(false);
+          setRegisterModalOpen(true);
+        }}
+        onForgotPassword={() => {
+          setLoginModalOpen(false);
+          navigate('/forgot-password');
+        }}
+      />
+
+      {/* 注册弹窗 */}
+      <RegisterModal
+        open={registerModalOpen}
+        onClose={() => setRegisterModalOpen(false)}
+        onRegisterSuccess={(user) => {
+          setCurrentUser(user);
+          setRegisterModalOpen(false);
+          message.success('注册成功，欢迎加入 Pixel！');
+        }}
+        onBackToLogin={() => {
+          setRegisterModalOpen(false);
+          setLoginModalOpen(true);
+        }}
+      />
     </div>
   );
 };

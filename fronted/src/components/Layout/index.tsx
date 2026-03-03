@@ -16,7 +16,7 @@ const AppLayout: React.FC = () => {
     {
       key: '/generate',
       icon: <PictureOutlined />,
-      label: 'AI头像生成',
+      label: 'AI图片生成',
     },
     {
       key: '/history',
