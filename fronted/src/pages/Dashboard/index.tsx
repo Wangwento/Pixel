@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Popover, Button } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Layout, Menu, Avatar, Popover, Button, Badge, Drawer, Modal, Form, Input, Empty, Spin, message } from 'antd';
 import {
   FireOutlined,
   AppstoreOutlined,
@@ -22,22 +22,39 @@ import {
   StarOutlined,
   SunOutlined,
   MoonOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import type { MenuProps } from 'antd';
+import dayjs from 'dayjs';
 import { useAuth } from '../../contexts/AuthContext';
+import { claimGrowthReward, completeProfileTask, getGrowthTasks } from '../../api/user';
+import type { GrowthTask } from '../../api/user';
 import logoSvg from '../../assets/ip.svg';
 import './index.css';
 
 const { Sider, Content } = Layout;
 
+type GrowthTaskListPayload = {
+  pendingCount?: number;
+  tasks?: GrowthTask[];
+};
+
 const Dashboard: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
+  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [growthTasks, setGrowthTasks] = useState<GrowthTask[]>([]);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark';
   });
-  const { currentUser, logout: authLogout } = useAuth();
+  const [profileForm] = Form.useForm<{ nickname: string; avatar: string }>();
+  const { currentUser, logout: authLogout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -54,6 +71,46 @@ const Dashboard: React.FC = () => {
       document.body.removeAttribute('data-theme');
     };
   }, [theme]);
+
+  const loadGrowthTasks = useCallback(async (silent: boolean = true) => {
+    if (!localStorage.getItem('token')) {
+      setPendingCount(0);
+      setGrowthTasks([]);
+      return;
+    }
+
+    setTaskLoading(true);
+    try {
+      const res = await getGrowthTasks() as unknown as {
+        code: number;
+        message?: string;
+        data?: GrowthTaskListPayload;
+      };
+
+      if (res.code === 200 && res.data) {
+        setPendingCount(res.data.pendingCount || 0);
+        setGrowthTasks(res.data.tasks || []);
+      } else if (!silent) {
+        message.error(res.message || '获取通知失败');
+      }
+    } catch (error: unknown) {
+      if (!silent) {
+        const err = error as { response?: { data?: { message?: string } } };
+        message.error(err.response?.data?.message || '获取通知失败');
+      }
+    } finally {
+      setTaskLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      loadGrowthTasks();
+      return;
+    }
+    setPendingCount(0);
+    setGrowthTasks([]);
+  }, [currentUser?.id, loadGrowthTasks]);
 
   // 第一部分菜单：热门、模版、资产
   const menuItemsPart1: MenuProps['items'] = [
@@ -114,6 +171,112 @@ const Dashboard: React.FC = () => {
   const handleLogout = () => {
     authLogout();
     navigate('/');
+  };
+
+  const openTaskDrawer = () => {
+    setTaskDrawerOpen(true);
+    loadGrowthTasks(false);
+  };
+
+  const openProfileRewardModal = () => {
+    profileForm.setFieldsValue({
+      nickname: currentUser?.nickname || currentUser?.username || '',
+      avatar: currentUser?.avatar || '',
+    });
+    setProfileModalOpen(true);
+  };
+
+  const handleTaskAction = async (task: GrowthTask) => {
+    if (task.actionType === 'COMPLETE_PROFILE') {
+      openProfileRewardModal();
+      return;
+    }
+
+    if (task.actionType !== 'CLAIM' || !task.recordId) {
+      return;
+    }
+
+    setActionLoadingId(task.recordId);
+    try {
+      const res = await claimGrowthReward(task.recordId) as unknown as {
+        code: number;
+        message?: string;
+        data?: {
+          pointsAdded?: number;
+          quotaAdded?: number;
+        };
+      };
+
+      if (res.code !== 200) {
+        message.error(res.message || '领取失败');
+        return;
+      }
+
+      const rewards: string[] = [];
+      if (res.data?.pointsAdded) {
+        rewards.push(`+${res.data.pointsAdded}积分`);
+      }
+      if (res.data?.quotaAdded) {
+        rewards.push(`+${res.data.quotaAdded}次免费额度`);
+      }
+
+      message.success(rewards.length > 0 ? `领取成功 ${rewards.join('，')}` : '奖励领取成功');
+      await Promise.all([loadGrowthTasks(), refreshUser()]);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || '领取失败，请稍后重试');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleProfileSubmit = async () => {
+    try {
+      const values = await profileForm.validateFields();
+      setProfileSubmitting(true);
+      const res = await completeProfileTask(values) as unknown as {
+        code: number;
+        message?: string;
+        data?: {
+          message?: string;
+        };
+      };
+
+      if (res.code !== 200) {
+        message.error(res.message || '保存资料失败');
+        return;
+      }
+
+      message.success(res.data?.message || res.message || '资料已完善，请在通知中领取奖励');
+      setProfileModalOpen(false);
+      await Promise.all([loadGrowthTasks(), refreshUser()]);
+    } catch (error: unknown) {
+      const formError = error as { errorFields?: Array<unknown>; response?: { data?: { message?: string } } };
+      if (formError.errorFields) {
+        return;
+      }
+      message.error(formError.response?.data?.message || '保存资料失败，请稍后重试');
+    } finally {
+      setProfileSubmitting(false);
+    }
+  };
+
+  const getTaskStatusText = (task: GrowthTask) => {
+    if (task.status === 'CLAIMABLE') {
+      return '待领取';
+    }
+    if (task.status === 'ACTION_REQUIRED') {
+      return '待完成';
+    }
+    return '已领取';
+  };
+
+  const getTaskTimeText = (task: GrowthTask) => {
+    const time = task.claimedAt || task.createdAt;
+    if (!time) {
+      return '';
+    }
+    return dayjs(time).format('YYYY-MM-DD HH:mm');
   };
 
   // 用户弹出面板内容
@@ -242,17 +405,23 @@ const Dashboard: React.FC = () => {
         collapsedWidth={72}
         className="dashboard-sider"
       >
-        {/* Logo */}
         <div className="sider-logo">
           <div className="logo-left" onClick={() => navigate('/')}>
             <img src={logoSvg} alt="Pixel" className="logo-img" />
             {!collapsed && <span className="logo-text">Pixel</span>}
           </div>
-          {!collapsed && (
-            <div className="theme-toggle" onClick={toggleTheme}>
-              {theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-            </div>
-          )}
+          <div className="logo-actions">
+            <Badge dot={pendingCount > 0} offset={[-2, 4]}>
+              <div className="notification-trigger" onClick={openTaskDrawer}>
+                <BellOutlined />
+              </div>
+            </Badge>
+            {!collapsed && (
+              <div className="theme-toggle" onClick={toggleTheme}>
+                {theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 第一部分菜单：热门、模版、资产 */}
@@ -364,6 +533,118 @@ const Dashboard: React.FC = () => {
           <Outlet />
         </Content>
       </Layout>
+
+      <Drawer
+        title="通知中心"
+        placement="right"
+        width={420}
+        open={taskDrawerOpen}
+        onClose={() => setTaskDrawerOpen(false)}
+        rootClassName="notification-drawer"
+      >
+        <div className="notification-summary">
+          <div className="notification-summary-main">
+            <span className="notification-summary-label">待处理任务</span>
+            <span className="notification-summary-value">{pendingCount}</span>
+          </div>
+          <div className="notification-summary-tip">
+            注册礼包、完善资料等奖励会先进入这里，需要你手动领取。
+          </div>
+        </div>
+
+        {taskLoading ? (
+          <div className="notification-loading">
+            <Spin size="large" />
+          </div>
+        ) : growthTasks.length > 0 ? (
+          <div className="notification-task-list">
+            {growthTasks.map((task) => (
+              <div className="notification-task-card" key={`${task.activityCode}-${task.recordId || 'action'}`}>
+                <div className="notification-task-header">
+                  <div>
+                    <div className="notification-task-title">{task.title}</div>
+                    <div className="notification-task-time">{getTaskTimeText(task)}</div>
+                  </div>
+                  <span className={`notification-task-badge ${task.status.toLowerCase()}`}>
+                    {getTaskStatusText(task)}
+                  </span>
+                </div>
+
+                <div className="notification-task-desc">{task.description}</div>
+
+                {task.rewardSummary && (
+                  <div className="notification-task-reward">{task.rewardSummary}</div>
+                )}
+
+                <div className="notification-task-footer">
+                  <span className="notification-task-tip">
+                    {task.status === 'CLAIMED'
+                      ? '奖励已到账，可继续完成其他任务。'
+                      : task.status === 'CLAIMABLE'
+                        ? '点击右侧按钮后立即到账。'
+                        : '先完善资料，完成后会变成可领取状态。'}
+                  </span>
+                  <Button
+                    type={task.status === 'CLAIMABLE' ? 'primary' : 'default'}
+                    ghost={task.status !== 'CLAIMABLE'}
+                    disabled={task.status === 'CLAIMED'}
+                    loading={task.recordId ? actionLoadingId === task.recordId : false}
+                    onClick={() => handleTaskAction(task)}
+                  >
+                    {task.status === 'CLAIMED'
+                      ? '已领取'
+                      : task.actionType === 'COMPLETE_PROFILE'
+                        ? '去完善'
+                        : '领取奖励'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="notification-empty">
+            <Empty description="暂无待处理通知" />
+          </div>
+        )}
+      </Drawer>
+
+      <Modal
+        title="完善个人信息"
+        open={profileModalOpen}
+        onCancel={() => setProfileModalOpen(false)}
+        onOk={handleProfileSubmit}
+        okText="保存并生成奖励"
+        cancelText="取消"
+        confirmLoading={profileSubmitting}
+        rootClassName="profile-reward-modal"
+        wrapClassName="profile-reward-modal-wrap"
+      >
+        <Form form={profileForm} layout="vertical">
+          <Form.Item
+            name="nickname"
+            label="昵称"
+            rules={[
+              { required: true, message: '请输入昵称' },
+              { max: 20, message: '昵称最多 20 个字符' },
+            ]}
+          >
+            <Input placeholder="请输入新的昵称" maxLength={20} />
+          </Form.Item>
+          <Form.Item
+            name="avatar"
+            label="头像地址"
+            rules={[
+              { required: true, message: '请输入头像地址' },
+              { type: 'url', message: '请输入有效的图片 URL' },
+            ]}
+          >
+            <Input placeholder="请输入头像图片 URL" />
+          </Form.Item>
+        </Form>
+        <div className="profile-reward-tip">
+          保存后会在通知中心生成“完善资料奖励”，需要你再手动领取，链路更清晰也更方便扩展活动。
+        </div>
+      </Modal>
     </Layout>
   );
 };

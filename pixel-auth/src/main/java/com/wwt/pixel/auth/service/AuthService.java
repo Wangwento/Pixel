@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.util.Random;
@@ -25,6 +27,7 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final UserGrowthEventProducer userGrowthEventProducer;
 
     @Value("${pixel.jwt.secret}")
     private String jwtSecret;
@@ -46,7 +49,7 @@ public class AuthService {
             throw new BusinessException("账号已被禁用");
         }
 
-        String token = JwtUtil.generateToken(user.getId(), user.getUsername(), jwtSecret);
+        String token = generateToken(user);
         log.info("用户登录成功: {}", username);
         return token;
     }
@@ -72,10 +75,10 @@ public class AuthService {
         user.setEmail(email);
         user.setPhoneVerified(0);
         user.setRealNameVerified(0);
-        user.setPoints(CommonConstant.REGISTER_GIFT_POINTS);
-        user.setTotalPoints(CommonConstant.REGISTER_GIFT_POINTS);
-        user.setFreeQuota(CommonConstant.REGISTER_GIFT_QUOTA);
-        user.setFreeQuotaTotal(CommonConstant.REGISTER_GIFT_QUOTA);
+        user.setPoints(0);
+        user.setTotalPoints(0);
+        user.setFreeQuota(0);
+        user.setFreeQuotaTotal(0);
         user.setDailyLimit(CommonConstant.DAILY_GENERATE_LIMIT);
         user.setDailyUsed(0);
         user.setDailyLimitDate(LocalDate.now());
@@ -99,8 +102,8 @@ public class AuthService {
         }
 
         userMapper.insert(user);
-        log.info("用户注册成功: {}, 赠送{}积分+{}次免费额度", username,
-                CommonConstant.REGISTER_GIFT_POINTS, CommonConstant.REGISTER_GIFT_QUOTA);
+        publishRegisterEventAfterCommit(user);
+        log.info("用户注册成功: {}, userId={}, 新人礼包改为通知手动领取", username, user.getId());
         return user;
     }
 
@@ -116,6 +119,23 @@ public class AuthService {
      */
     public User findByUsername(String username) {
         return userMapper.findByUsername(username);
+    }
+
+    public String generateToken(User user) {
+        return JwtUtil.generateToken(user.getId(), user.getUsername(), jwtSecret);
+    }
+
+    private void publishRegisterEventAfterCommit(User user) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            userGrowthEventProducer.sendUserRegisteredEvent(user.getId(), user.getUsername(), user.getInvitedBy());
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                userGrowthEventProducer.sendUserRegisteredEvent(user.getId(), user.getUsername(), user.getInvitedBy());
+            }
+        });
     }
 
     /**

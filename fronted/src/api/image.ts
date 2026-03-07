@@ -95,8 +95,21 @@ export const generate = (params: GenerationRequest) => {
 };
 
 // 获取生成历史
-export const getImageHistory = (page: number = 1, pageSize: number = 10) => {
-  return api.get('/image/history', { params: { page, pageSize } });
+export const getImageHistory = (
+  page: number = 1,
+  pageSize: number = 10,
+  filters?: {
+    startDate?: string;
+    endDate?: string;
+  }
+) => {
+  return api.get('/image/history', {
+    params: {
+      page,
+      pageSize,
+      ...filters,
+    },
+  });
 };
 
 // 模型信息

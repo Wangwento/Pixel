@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Spin,
   Empty,
@@ -9,6 +9,7 @@ import {
   Input,
   Tooltip,
   Button,
+  Pagination,
 } from 'antd';
 import {
   DownloadOutlined,
@@ -35,16 +36,21 @@ interface AssetItem {
   createdAt: string;
 }
 
+const buildPreviewUrl = (imageUrl: string, size: number = 720) => {
+  if (!imageUrl || !imageUrl.includes('aliyuncs.com') || imageUrl.includes('x-oss-process=')) {
+    return imageUrl;
+  }
+  const separator = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${separator}x-oss-process=image/resize,m_fill,w_${size},h_${size}/quality,q_85`;
+};
+
 const Assets: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [data, setData] = useState<AssetItem[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
 
-  // Modal states
   const [fullscreenVisible, setFullscreenVisible] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<AssetItem | null>(null);
   const [textModalVisible, setTextModalVisible] = useState(false);
@@ -56,84 +62,36 @@ const Assets: React.FC = () => {
   const [shareImage, setShareImage] = useState<AssetItem | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const pageSize = 12;
+  const pageSize = 24;
   const containerRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const fetchAssets = async (page: number, append: boolean = false) => {
-    if (page === 1) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+  const fetchAssets = async (page: number) => {
+    setLoading(true);
 
     try {
-      const response: any = await getImageHistory(page, pageSize);
+      const response: any = await getImageHistory(page, pageSize, {
+        startDate: dateRange?.[0]?.format('YYYY-MM-DD'),
+        endDate: dateRange?.[1]?.format('YYYY-MM-DD'),
+      });
+
       if (response.code === 200) {
-        let list = response.data.list || [];
-        const totalCount = response.data.total || 0;
-
-        // Apply date filter on client side if set
-        if (dateRange && dateRange[0] && dateRange[1]) {
-          const startDate = dateRange[0].startOf('day');
-          const endDate = dateRange[1].endOf('day');
-          list = list.filter((item: AssetItem) => {
-            const itemDate = dayjs(item.createdAt);
-            return itemDate.isAfter(startDate) && itemDate.isBefore(endDate);
-          });
-        }
-
-        if (append) {
-          setData(prev => [...prev, ...list]);
-        } else {
-          setData(list);
-        }
-        setTotal(totalCount);
-        setHasMore(page * pageSize < totalCount);
+        setData(response.data.list || []);
+        setTotal(response.data.total || 0);
       }
     } catch (error) {
       message.error('获取资产列表失败');
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    setCurrent(1);
-    setData([]);
-    fetchAssets(1, false);
-  }, [dateRange]);
+    fetchAssets(current);
+  }, [current, dateRange]);
 
-  // Setup Intersection Observer for infinite scroll
-  useEffect(() => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        const first = entries[0];
-        if (first.isIntersecting && hasMore && !loading && !loadingMore) {
-          const nextPage = current + 1;
-          setCurrent(nextPage);
-          fetchAssets(nextPage, true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loadMoreRef.current) {
-      observerRef.current.observe(loadMoreRef.current);
-    }
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [hasMore, loading, loadingMore, current]);
+  const scrollToTop = () => {
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleDownload = async (item: AssetItem) => {
     try {
@@ -149,7 +107,6 @@ const Assets: React.FC = () => {
       window.URL.revokeObjectURL(url);
       message.success('下载成功');
     } catch (error) {
-      // Fallback for cross-origin images
       const link = document.createElement('a');
       link.href = item.imageUrl;
       link.download = `pixel-ai-${item.id}-${Date.now()}.png`;
@@ -170,15 +127,17 @@ const Assets: React.FC = () => {
   };
 
   const handleCopyLink = async () => {
-    if (shareImage) {
-      try {
-        await navigator.clipboard.writeText(shareImage.imageUrl);
-        setCopied(true);
-        message.success('链接已复制');
-        setTimeout(() => setCopied(false), 2000);
-      } catch (error) {
-        message.error('复制失败');
-      }
+    if (!shareImage) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareImage.imageUrl);
+      setCopied(true);
+      message.success('链接已复制');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      message.error('复制失败');
     }
   };
 
@@ -198,17 +157,25 @@ const Assets: React.FC = () => {
   };
 
   const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+    setCurrent(1);
     setDateRange(dates);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrent(page);
+    scrollToTop();
   };
 
   const renderAssetCard = (item: AssetItem) => (
     <div key={item.id} className="asset-card">
       <div className="asset-image-wrapper">
         <img
-          src={item.imageUrl}
+          src={buildPreviewUrl(item.imageUrl)}
           alt={item.prompt}
           className="asset-image"
           loading="lazy"
+          decoding="async"
+          fetchPriority="low"
         />
         <div className="asset-overlay">
           <div className="asset-actions">
@@ -258,7 +225,6 @@ const Assets: React.FC = () => {
 
   return (
     <div className="assets-container" ref={containerRef}>
-      {/* Header */}
       <div className="assets-header">
         <div className="assets-title">
           <h2>我的资产</h2>
@@ -276,25 +242,21 @@ const Assets: React.FC = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <Spin spinning={loading && current === 1}>
+      <Spin spinning={loading}>
         {data.length > 0 ? (
           <>
             <div className="assets-grid">
               {data.map(renderAssetCard)}
             </div>
-
-            {/* Load more trigger */}
-            <div ref={loadMoreRef} className="load-more-trigger">
-              {loadingMore && (
-                <div className="loading-more">
-                  <Spin size="small" />
-                  <span>加载更多...</span>
-                </div>
-              )}
-              {!hasMore && data.length > 0 && (
-                <div className="no-more">已经到底啦 ~</div>
-              )}
+            <div className="assets-pagination">
+              <Pagination
+                current={current}
+                total={total}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+                showSizeChanger={false}
+                showTotal={(count) => `共 ${count} 张图片`}
+              />
             </div>
           </>
         ) : (
@@ -302,14 +264,17 @@ const Assets: React.FC = () => {
         )}
       </Spin>
 
-      {/* Fullscreen Modal */}
       <Modal
         open={fullscreenVisible}
-        onCancel={() => setFullscreenVisible(false)}
+        onCancel={() => {
+          setFullscreenVisible(false);
+          setFullscreenImage(null);
+        }}
         footer={null}
         width="90vw"
         className="fullscreen-modal"
         centered
+        destroyOnHidden
         closeIcon={<CloseOutlined className="close-icon" />}
       >
         {fullscreenImage && (
@@ -329,19 +294,22 @@ const Assets: React.FC = () => {
         )}
       </Modal>
 
-      {/* Share Modal */}
       <Modal
         open={shareModalVisible}
-        onCancel={() => setShareModalVisible(false)}
+        onCancel={() => {
+          setShareModalVisible(false);
+          setShareImage(null);
+        }}
         footer={null}
         title="分享图片"
         className="share-modal"
         centered
+        destroyOnHidden
       >
         {shareImage && (
           <div className="share-content">
             <img
-              src={shareImage.imageUrl}
+              src={buildPreviewUrl(shareImage.imageUrl, 960)}
               alt={shareImage.prompt}
               className="share-preview"
             />
@@ -364,15 +332,18 @@ const Assets: React.FC = () => {
         )}
       </Modal>
 
-      {/* Crop Modal */}
       <Modal
         open={cropModalVisible}
-        onCancel={() => setCropModalVisible(false)}
+        onCancel={() => {
+          setCropModalVisible(false);
+          setCropImage(null);
+        }}
         footer={null}
         title="裁剪图片"
         className="crop-modal"
         centered
         width={800}
+        destroyOnHidden
       >
         {cropImage && (
           <div className="crop-content">
@@ -393,16 +364,27 @@ const Assets: React.FC = () => {
         )}
       </Modal>
 
-      {/* Add Text Modal */}
       <Modal
         open={textModalVisible}
-        onCancel={() => setTextModalVisible(false)}
+        onCancel={() => {
+          setTextModalVisible(false);
+          setTextModalImage(null);
+          setOverlayText('');
+        }}
         title="添加文字"
         className="text-modal"
         centered
         width={800}
+        destroyOnHidden
         footer={[
-          <Button key="cancel" onClick={() => setTextModalVisible(false)}>
+          <Button
+            key="cancel"
+            onClick={() => {
+              setTextModalVisible(false);
+              setTextModalImage(null);
+              setOverlayText('');
+            }}
+          >
             取消
           </Button>,
           <Button
@@ -411,6 +393,8 @@ const Assets: React.FC = () => {
             onClick={() => {
               message.success('文字添加功能即将上线');
               setTextModalVisible(false);
+              setTextModalImage(null);
+              setOverlayText('');
             }}
           >
             保存

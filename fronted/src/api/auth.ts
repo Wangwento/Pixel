@@ -31,7 +31,7 @@ export type UserInfo = {
   level: number;
   isVip: boolean;
   inviteCode?: string;
-  profileCompleted: boolean;
+  profileCompleted: boolean | number;
 };
 
 export type AuthResponse = {

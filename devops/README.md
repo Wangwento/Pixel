@@ -74,7 +74,9 @@ devops/
 # MySQL
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/pixel?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    # pixel-auth / pixel-user -> pixel_user
+    # pixel-image -> pixel_image
+    url: jdbc:mysql://localhost:3306/pixel_user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
     username: root
     password: wang331333
 

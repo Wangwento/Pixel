@@ -80,6 +80,30 @@
   color: #63b3ed;
 }
 
+.logo-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-trigger {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+.notification-trigger:hover {
+  background: rgba(99, 179, 237, 0.15);
+  color: #63b3ed;
+}
+
 /* 外部收缩按钮 */
 .collapse-toggle {
   position: fixed;
@@ -211,6 +235,195 @@
 .sider-footer {
   padding: 12px;
   border-top: 1px solid rgba(99, 179, 237, 0.1);
+}
+
+.notification-drawer .ant-drawer-header {
+  background: #161b22;
+  border-bottom: 1px solid rgba(99, 179, 237, 0.12);
+}
+
+.notification-drawer .ant-drawer-title,
+.notification-drawer .ant-drawer-close {
+  color: #fff !important;
+}
+
+.notification-drawer .ant-drawer-body {
+  background: #0d1117;
+  padding: 20px;
+}
+
+.notification-summary {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 179, 237, 0.12);
+  background: rgba(99, 179, 237, 0.06);
+  margin-bottom: 16px;
+}
+
+.notification-summary-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.notification-summary-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.notification-summary-value {
+  color: #63b3ed;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.notification-summary-tip {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.notification-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-task-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 179, 237, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.notification-task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.notification-task-title {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.notification-task-time {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+}
+
+.notification-task-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notification-task-badge.claimable {
+  background: rgba(99, 179, 237, 0.16);
+  color: #63b3ed;
+}
+
+.notification-task-badge.action_required {
+  background: rgba(236, 201, 75, 0.14);
+  color: #ecc94b;
+}
+
+.notification-task-badge.claimed {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.notification-task-desc {
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.notification-task-reward {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(129, 230, 217, 0.12);
+  color: #81e6d9;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notification-task-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.notification-task-tip {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.notification-empty,
+.notification-loading {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-reward-modal .ant-modal-content {
+  background: #161b22;
+  border: 1px solid rgba(99, 179, 237, 0.12);
+}
+
+.profile-reward-modal .ant-modal-header {
+  background: transparent;
+  border-bottom: 1px solid rgba(99, 179, 237, 0.12);
+  margin-bottom: 20px;
+}
+
+.profile-reward-modal .ant-modal-title,
+.profile-reward-modal .ant-modal-close {
+  color: #fff !important;
+}
+
+.profile-reward-modal .ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.profile-reward-modal .ant-input {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(99, 179, 237, 0.16);
+  color: #fff;
+}
+
+.profile-reward-modal .ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.profile-reward-modal .ant-input:hover,
+.profile-reward-modal .ant-input:focus {
+  border-color: rgba(99, 179, 237, 0.4);
+  box-shadow: none;
+}
+
+.profile-reward-tip {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(99, 179, 237, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .user-trigger {
@@ -614,6 +827,15 @@
   color: #2b6cb0;
 }
 
+.theme-light .notification-trigger {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.theme-light .notification-trigger:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #2b6cb0;
+}
+
 .theme-light .collapse-toggle {
   background: linear-gradient(180deg, #fff 0%, #f8f9fb 100%);
   border-color: #e8ecf1;
@@ -807,4 +1029,99 @@ body[data-theme="light"] .popover-footer a {
 
 body[data-theme="light"] .popover-footer a:hover {
   color: #2b6cb0;
+}
+
+body[data-theme="light"] .notification-drawer .ant-drawer-header {
+  background: #fff;
+  border-bottom: 1px solid #e8ecf1;
+}
+
+body[data-theme="light"] .notification-drawer .ant-drawer-title,
+body[data-theme="light"] .notification-drawer .ant-drawer-close {
+  color: #1a202c !important;
+}
+
+body[data-theme="light"] .notification-drawer .ant-drawer-body {
+  background: #f5f7fa;
+}
+
+body[data-theme="light"] .notification-summary {
+  background: #fff;
+  border-color: #e8ecf1;
+}
+
+body[data-theme="light"] .notification-summary-label {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+body[data-theme="light"] .notification-summary-value {
+  color: #2b6cb0;
+}
+
+body[data-theme="light"] .notification-summary-tip {
+  color: rgba(0, 0, 0, 0.42);
+}
+
+body[data-theme="light"] .notification-task-card {
+  background: #fff;
+  border-color: #e8ecf1;
+}
+
+body[data-theme="light"] .notification-task-title {
+  color: #1a202c;
+}
+
+body[data-theme="light"] .notification-task-time {
+  color: rgba(0, 0, 0, 0.32);
+}
+
+body[data-theme="light"] .notification-task-badge.claimed {
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.4);
+}
+
+body[data-theme="light"] .notification-task-desc {
+  color: rgba(0, 0, 0, 0.68);
+}
+
+body[data-theme="light"] .notification-task-reward {
+  background: rgba(44, 122, 123, 0.1);
+  color: #2c7a7b;
+}
+
+body[data-theme="light"] .notification-task-tip {
+  color: rgba(0, 0, 0, 0.42);
+}
+
+body[data-theme="light"] .profile-reward-modal .ant-modal-content {
+  background: #fff;
+  border: 1px solid #e8ecf1;
+}
+
+body[data-theme="light"] .profile-reward-modal .ant-modal-header {
+  border-bottom: 1px solid #e8ecf1;
+}
+
+body[data-theme="light"] .profile-reward-modal .ant-modal-title,
+body[data-theme="light"] .profile-reward-modal .ant-modal-close {
+  color: #1a202c !important;
+}
+
+body[data-theme="light"] .profile-reward-modal .ant-form-item-label > label {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+body[data-theme="light"] .profile-reward-modal .ant-input {
+  background: #fff;
+  border-color: #d7dee7;
+  color: #1a202c;
+}
+
+body[data-theme="light"] .profile-reward-modal .ant-input::placeholder {
+  color: rgba(0, 0, 0, 0.28);
+}
+
+body[data-theme="light"] .profile-reward-tip {
+  background: rgba(43, 108, 176, 0.06);
+  color: rgba(0, 0, 0, 0.56);
 }

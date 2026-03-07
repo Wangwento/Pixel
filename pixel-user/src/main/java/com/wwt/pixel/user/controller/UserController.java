@@ -2,6 +2,7 @@ package com.wwt.pixel.user.controller;
 
 import com.wwt.pixel.common.dto.Result;
 import com.wwt.pixel.user.domain.User;
+import com.wwt.pixel.user.service.UserGrowthService;
 import com.wwt.pixel.user.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private final UserGrowthService userGrowthService;
 
     /**
      * 用户签到
@@ -50,10 +52,39 @@ public class UserController {
     public Result<Map<String, Object>> completeProfile(
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody ProfileRequest request) {
-        int earnedPoints = userService.completeProfileReward(userId, request.getNickname(), request.getAvatar());
+        UserGrowthService.GrowthTaskDTO task = userGrowthService.completeProfileTask(
+                userId, request.getNickname(), request.getAvatar());
 
         Map<String, Object> data = new HashMap<>();
-        data.put("earnedPoints", earnedPoints);
+        data.put("task", task);
+        data.put("message", "资料已完善，请在通知中领取奖励");
+        data.put("quotaInfo", userService.getQuotaInfo(userId));
+        return Result.success(data);
+    }
+
+    /**
+     * 获取增长任务/通知
+     */
+    @GetMapping("/growth/tasks")
+    public Result<Map<String, Object>> getGrowthTasks(@RequestHeader("X-User-Id") Long userId) {
+        UserGrowthService.TaskListResult result = userGrowthService.listTasks(userId);
+        Map<String, Object> data = new HashMap<>();
+        data.put("pendingCount", result.getPendingCount());
+        data.put("tasks", result.getTasks());
+        return Result.success(data);
+    }
+
+    /**
+     * 领取增长奖励
+     */
+    @PostMapping("/growth/claim/{recordId}")
+    public Result<Map<String, Object>> claimGrowthReward(@RequestHeader("X-User-Id") Long userId,
+                                                         @PathVariable Long recordId) {
+        UserGrowthService.ClaimResult result = userGrowthService.claimReward(userId, recordId);
+        Map<String, Object> data = new HashMap<>();
+        data.put("pointsAdded", result.getPointsAdded());
+        data.put("quotaAdded", result.getQuotaAdded());
+        data.put("task", result.getTask());
         data.put("quotaInfo", userService.getQuotaInfo(userId));
         return Result.success(data);
     }

@@ -36,8 +36,10 @@ public class AuthController {
                 request.getEmail(),
                 request.getInviteCode()
         );
+        String token = authService.generateToken(user);
 
         Map<String, Object> data = new HashMap<>();
+        data.put("token", token);
         data.put("user", toUserVO(user));
         return Result.success("注册成功", data);
     }
