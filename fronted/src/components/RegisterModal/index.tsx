@@ -112,14 +112,14 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
       keyboard={false}
       classNames={{
         wrapper: 'register-modal-wrapper',
-        content: 'register-modal-content',
+        container: 'register-modal-content',
         body: 'register-modal-body',
       }}
       styles={{
         mask: {
           backdropFilter: 'blur(4px)',
         },
-        content: {
+        container: {
           background: 'transparent',
           boxShadow: 'none',
           padding: 0,

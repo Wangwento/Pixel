@@ -1,6 +1,7 @@
 package com.wwt.pixel.user.controller;
 
 import com.wwt.pixel.common.dto.Result;
+import com.wwt.pixel.user.domain.User;
 import com.wwt.pixel.user.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -73,6 +74,18 @@ public class UserController {
     public Result<String> consumeQuota(@RequestHeader("X-User-Id") Long userId) {
         String consumeType = userService.consumeQuota(userId);
         return Result.success(consumeType);
+    }
+
+    /**
+     * 获取用户VIP等级 (供Image服务内部调用)
+     */
+    @GetMapping("/internal/vip-level")
+    public Result<Integer> getVipLevel(@RequestHeader("X-User-Id") Long userId) {
+        User user = userService.findById(userId);
+        if (user == null) {
+            return Result.success(0);
+        }
+        return Result.success(user.isVip() ? user.getVipLevel() : 0);
     }
 
     @Data

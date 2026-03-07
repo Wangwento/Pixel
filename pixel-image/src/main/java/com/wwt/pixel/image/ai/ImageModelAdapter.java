@@ -11,11 +11,27 @@ public interface ImageModelAdapter {
 
     GenerationResult generate(GenerationRequest request);
 
+    default boolean supportsImageInput() {
+        return false;
+    }
+
     default int getWeight() {
         return 1;
     }
 
     default int getTimeoutMs() {
         return 60000;
+    }
+
+    default String getModelId() {
+        return null;
+    }
+
+    default String getModelDisplayName() {
+        return null;
+    }
+
+    default int getMinVipLevel() {
+        return 0;
     }
 }

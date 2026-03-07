@@ -310,11 +310,6 @@ public class JingdongImageAdapter implements ImageModelAdapter {
     }
 
     private String buildPrompt(GenerationRequest request) {
-        StringBuilder sb = new StringBuilder();
-        if (StringUtils.hasText(request.getStyle())) {
-            sb.append(request.getStyle()).append("风格，");
-        }
-        sb.append(request.getPrompt());
-        return sb.toString();
+        return request.getPrompt();
     }
 }

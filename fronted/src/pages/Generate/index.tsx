@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Input,
@@ -22,7 +22,8 @@ import {
 import type { UploadFile, UploadProps } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { text2img, img2img } from '../../api/image';
-import type { GenerationResult, Text2ImgRequest, Img2ImgRequest } from '../../api/image';
+import type { GenerationResponse, Text2ImgRequest, Img2ImgRequest } from '../../api/image';
+import { useThrottle } from '../../hooks/useDebounce';
 import './index.css';
 
 const { TextArea } = Input;
@@ -53,12 +54,12 @@ const Generate: React.FC = () => {
   // 如果有初始prompt，自动开始生成
   useEffect(() => {
     if (initialPrompt) {
-      handleTextToImage();
+      throttledTextToImage();
     }
   }, []);
 
   // 文生图
-  const handleTextToImage = async () => {
+  const handleTextToImage = useCallback(async () => {
     if (!prompt.trim()) {
       message.warning('请输入提示词描述');
       return;
@@ -69,12 +70,23 @@ const Generate: React.FC = () => {
       const requestParams: Text2ImgRequest = {
         prompt: prompt.trim(),
         style: style,
+        aspectRatio: '1:1',
+        imageSize: '1K',
       };
 
-      const response = await text2img(requestParams) as unknown as { code: number; data: GenerationResult; message?: string };
+      const response = await text2img(requestParams) as unknown as { code: number; data: GenerationResponse; message?: string };
       if (response.code === 200 && response.data) {
-        setGeneratedImage(response.data.ossUrl || response.data.imageUrl || '');
-        message.success('图片生成成功！');
+        const res = response.data;
+
+        // 处理不同的任务状态
+        if (res.taskStatus === 'RUNNING') {
+          message.info(res.message || '图片正在生成中，请稍候...');
+        } else if (res.taskStatus === 'SUCCESS' && res.result) {
+          setGeneratedImage(res.result.ossUrl || res.result.imageUrl || '');
+          message.success('图片生成成功！');
+        } else if (res.taskStatus === 'FAILED') {
+          message.error(res.message || '生成失败');
+        }
       } else {
         message.error(response.message || '生成失败');
       }
@@ -84,10 +96,13 @@ const Generate: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [prompt, style]);
+
+  // 使用节流，防止用户频繁点击（2秒内只能点击一次）
+  const throttledTextToImage = useThrottle(handleTextToImage, 2000);
 
   // 图生图
-  const handleImageToImage = async () => {
+  const handleImageToImage = useCallback(async () => {
     if (!prompt.trim()) {
       message.warning('请输入提示词描述');
       return;
@@ -99,25 +114,31 @@ const Generate: React.FC = () => {
 
     setLoading(true);
     try {
-      // 将图片转为 base64
-      const file = fileList[0].originFileObj as File;
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const images = fileList
+        .map((file) => file.originFileObj as File | undefined)
+        .filter((file): file is File => Boolean(file));
 
       const requestParams: Img2ImgRequest = {
         prompt: prompt.trim(),
         style: style,
-        sourceImageBase64: base64,
+        aspectRatio: '1:1',
+        imageSize: '1K',
+        images,
       };
 
-      const response = await img2img(requestParams) as unknown as { code: number; data: GenerationResult; message?: string };
+      const response = await img2img(requestParams) as unknown as { code: number; data: GenerationResponse; message?: string };
       if (response.code === 200 && response.data) {
-        setGeneratedImage(response.data.ossUrl || response.data.imageUrl || '');
-        message.success('图片生成成功！');
+        const res = response.data;
+
+        // 处理不同的任务状态
+        if (res.taskStatus === 'RUNNING') {
+          message.info(res.message || '图片正在生成中，请稍候...');
+        } else if (res.taskStatus === 'SUCCESS' && res.result) {
+          setGeneratedImage(res.result.ossUrl || res.result.imageUrl || '');
+          message.success('图片生成成功！');
+        } else if (res.taskStatus === 'FAILED') {
+          message.error(res.message || '生成失败');
+        }
       } else {
         message.error(response.message || '生成失败');
       }
@@ -127,7 +148,10 @@ const Generate: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [prompt, style, fileList]);
+
+  // 使用节流，防止用户频繁点击（2秒内只能点击一次）
+  const throttledImageToImage = useThrottle(handleImageToImage, 2000);
 
   // 下载图片
   const handleDownload = () => {
@@ -143,19 +167,20 @@ const Generate: React.FC = () => {
       const isImage = file.type.startsWith('image/');
       if (!isImage) {
         message.error('只能上传图片文件！');
-        return false;
+        return Upload.LIST_IGNORE;
       }
       const isLt5M = file.size / 1024 / 1024 < 5;
       if (!isLt5M) {
         message.error('图片大小不能超过5MB！');
-        return false;
+        return Upload.LIST_IGNORE;
       }
       return false;
     },
     fileList,
-    onChange: ({ fileList }) => setFileList(fileList.slice(-1)),
+    onChange: ({ fileList }) => setFileList(fileList.slice(0, 10)),
     listType: 'picture-card',
-    maxCount: 1,
+    multiple: true,
+    maxCount: 10,
   };
 
   const tabItems = [
@@ -188,7 +213,7 @@ const Generate: React.FC = () => {
             type="primary"
             icon={<SendOutlined />}
             size="large"
-            onClick={handleTextToImage}
+            onClick={throttledTextToImage}
             loading={loading}
             block
           >
@@ -205,10 +230,12 @@ const Generate: React.FC = () => {
           <div className="form-item">
             <label>上传参考图片</label>
             <Upload {...uploadProps}>
-              {fileList.length === 0 && (
+              {fileList.length < 10 && (
                 <div>
                   <UploadOutlined />
-                  <div style={{ marginTop: 8 }}>点击上传</div>
+                  <div style={{ marginTop: 8 }}>
+                    {fileList.length === 0 ? '点击上传（最多10张）' : `继续上传（${fileList.length}/10）`}
+                  </div>
                 </div>
               )}
             </Upload>
@@ -237,7 +264,7 @@ const Generate: React.FC = () => {
             type="primary"
             icon={<SendOutlined />}
             size="large"
-            onClick={handleImageToImage}
+            onClick={throttledImageToImage}
             loading={loading}
             block
           >

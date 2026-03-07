@@ -25,6 +25,9 @@ public class GeminiChatImageAdapter implements ImageModelAdapter {
     private final String model;
     private final String vendorCode;
     private final String vendorName;
+    private final String modelId;
+    private final String modelDisplayName;
+    private final int minVipLevel;
     private final int weight;
     private final int timeoutMs;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -32,6 +35,12 @@ public class GeminiChatImageAdapter implements ImageModelAdapter {
 
     public GeminiChatImageAdapter(String vendorCode, String vendorName, String apiKey,
                                    String baseUrl, String model, int weight, int timeoutMs) {
+        this(vendorCode, vendorName, apiKey, baseUrl, model, weight, timeoutMs, null, null, 0);
+    }
+
+    public GeminiChatImageAdapter(String vendorCode, String vendorName, String apiKey,
+                                   String baseUrl, String model, int weight, int timeoutMs,
+                                   String modelId, String modelDisplayName, int minVipLevel) {
         this.vendorCode = vendorCode;
         this.vendorName = vendorName;
         this.apiKey = apiKey;
@@ -39,6 +48,9 @@ public class GeminiChatImageAdapter implements ImageModelAdapter {
         this.model = model;
         this.weight = weight;
         this.timeoutMs = timeoutMs;
+        this.modelId = modelId;
+        this.modelDisplayName = modelDisplayName;
+        this.minVipLevel = minVipLevel;
     }
 
     @Override
@@ -114,6 +126,21 @@ public class GeminiChatImageAdapter implements ImageModelAdapter {
     @Override
     public int getTimeoutMs() {
         return timeoutMs;
+    }
+
+    @Override
+    public String getModelId() {
+        return modelId;
+    }
+
+    @Override
+    public String getModelDisplayName() {
+        return modelDisplayName;
+    }
+
+    @Override
+    public int getMinVipLevel() {
+        return minVipLevel;
     }
 
     private Map<String, Object> buildChatRequestBody(String prompt) {
@@ -196,15 +223,10 @@ public class GeminiChatImageAdapter implements ImageModelAdapter {
     }
 
     private String buildPrompt(GenerationRequest request) {
-        StringBuilder sb = new StringBuilder();
-        if (StringUtils.hasText(request.getStyle())) {
-            sb.append(request.getStyle()).append("风格，");
-        }
-        sb.append(request.getPrompt());
-        sb.append("，头像，高清，精致");
+        String prompt = request.getPrompt();
         if (StringUtils.hasText(request.getNegativePrompt())) {
-            sb.append("。请避免: ").append(request.getNegativePrompt());
+            prompt += "。请避免: " + request.getNegativePrompt();
         }
-        return sb.toString();
+        return prompt;
     }
 }

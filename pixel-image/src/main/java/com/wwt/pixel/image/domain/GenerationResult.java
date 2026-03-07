@@ -11,6 +11,16 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GenerationResult {
 
+    /**
+     * 任务ID（用于幂等处理）
+     */
+    private String taskId;
+
+    /**
+     * 任务状态：RUNNING-生成中, SUCCESS-成功, FAILED-失败
+     */
+    private String taskStatus;
+
     private String imageUrl;
 
     private String imageBase64;

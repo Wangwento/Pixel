@@ -24,12 +24,21 @@ public class OpenAiCompatibleAdapter implements ImageModelAdapter {
     private final String model;
     private final String vendorCode;
     private final String vendorName;
+    private final String modelId;
+    private final String modelDisplayName;
+    private final int minVipLevel;
     private final int weight;
     private final int timeoutMs;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public OpenAiCompatibleAdapter(String vendorCode, String vendorName, String apiKey,
                                    String baseUrl, String model, int weight, int timeoutMs) {
+        this(vendorCode, vendorName, apiKey, baseUrl, model, weight, timeoutMs, null, null, 0);
+    }
+
+    public OpenAiCompatibleAdapter(String vendorCode, String vendorName, String apiKey,
+                                   String baseUrl, String model, int weight, int timeoutMs,
+                                   String modelId, String modelDisplayName, int minVipLevel) {
         this.vendorCode = vendorCode;
         this.vendorName = vendorName;
         this.apiKey = apiKey;
@@ -37,6 +46,9 @@ public class OpenAiCompatibleAdapter implements ImageModelAdapter {
         this.model = model;
         this.weight = weight;
         this.timeoutMs = timeoutMs;
+        this.modelId = modelId;
+        this.modelDisplayName = modelDisplayName;
+        this.minVipLevel = minVipLevel;
     }
 
     @Override
@@ -107,6 +119,21 @@ public class OpenAiCompatibleAdapter implements ImageModelAdapter {
         return timeoutMs;
     }
 
+    @Override
+    public String getModelId() {
+        return modelId;
+    }
+
+    @Override
+    public String getModelDisplayName() {
+        return modelDisplayName;
+    }
+
+    @Override
+    public int getMinVipLevel() {
+        return minVipLevel;
+    }
+
     private Map<String, Object> buildRequestBody(String prompt, GenerationRequest request) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", model);
@@ -140,15 +167,10 @@ public class OpenAiCompatibleAdapter implements ImageModelAdapter {
     }
 
     private String buildPrompt(GenerationRequest request) {
-        StringBuilder sb = new StringBuilder();
-        if (StringUtils.hasText(request.getStyle())) {
-            sb.append(request.getStyle()).append(" style, ");
-        }
-        sb.append(request.getPrompt());
-        sb.append(", portrait, avatar, high quality, detailed");
+        String prompt = request.getPrompt();
         if (StringUtils.hasText(request.getNegativePrompt())) {
-            sb.append(", avoid: ").append(request.getNegativePrompt());
+            prompt += ", avoid: " + request.getNegativePrompt();
         }
-        return sb.toString();
+        return prompt;
     }
 }

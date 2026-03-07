@@ -1,0 +1,279 @@
+/* VIP 会员充值页面 */
+.vip-page {
+  padding: 40px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #0d1117;
+}
+
+/* 返回按钮 */
+.vip-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 16px;
+  transition: color 0.2s ease;
+}
+
+.vip-back:hover {
+  color: #63b3ed;
+}
+
+/* 页面头部 */
+.vip-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.vip-title {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #63b3ed 0%, #81e6d9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.vip-title-icon {
+  font-size: 28px;
+  -webkit-text-fill-color: #63b3ed;
+}
+
+.vip-subtitle {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 15px;
+  margin-bottom: 28px;
+}
+
+/* 按月/按年切换 */
+.billing-toggle {
+  display: inline-flex;
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid rgba(99, 179, 237, 0.15);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.toggle-btn {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-btn.active {
+  background: linear-gradient(135deg, #63b3ed 0%, #81e6d9 100%);
+  color: #0d1117;
+  font-weight: 600;
+}
+
+.toggle-btn:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.save-badge {
+  font-size: 11px;
+  background: rgba(129, 230, 217, 0.2);
+  color: #81e6d9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.toggle-btn.active .save-badge {
+  background: rgba(13, 17, 23, 0.2);
+  color: #0d1117;
+}
+
+/* 三列卡片布局 */
+.vip-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* 卡片基础样式 */
+.plan-card {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid rgba(99, 179, 237, 0.12);
+  border-radius: 16px;
+  padding: 32px 28px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.plan-card:hover {
+  border-color: rgba(99, 179, 237, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* 推荐卡片 */
+.plan-card.recommended {
+  border-color: rgba(99, 179, 237, 0.4);
+  background: linear-gradient(
+    180deg,
+    rgba(99, 179, 237, 0.08) 0%,
+    rgba(22, 27, 34, 0.9) 100%
+  );
+}
+
+.recommended-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: linear-gradient(135deg, #63b3ed 0%, #81e6d9 100%);
+  color: #0d1117;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 6px;
+}
+
+/* 方案名称 */
+.plan-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+/* 价格区域 */
+.plan-price-section {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.plan-currency {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-right: 2px;
+}
+
+.plan-price {
+  font-size: 48px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.plan-period {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 4px;
+}
+
+.plan-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+/* 按钮样式 */
+.plan-btn {
+  width: 100%;
+  padding: 12px 0;
+  border: 1px solid rgba(99, 179, 237, 0.3);
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 28px;
+}
+
+.plan-btn:hover:not(:disabled) {
+  border-color: #63b3ed;
+  background: rgba(99, 179, 237, 0.1);
+}
+
+.plan-btn.recommended-btn {
+  background: linear-gradient(135deg, #63b3ed 0%, #81e6d9 100%);
+  border: none;
+  color: #0d1117;
+}
+
+.plan-btn.recommended-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.plan-btn.current-btn,
+.plan-btn:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: default;
+}
+
+/* 权益列表 */
+.plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.feature-icon {
+  font-size: 16px;
+  color: rgba(99, 179, 237, 0.7);
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plan-card.recommended .feature-icon {
+  color: #63b3ed;
+}
+
+.feature-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+  .vip-plans {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .vip-plans {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

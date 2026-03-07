@@ -220,13 +220,7 @@ public class HunyuanImageAdapter implements ImageModelAdapter {
     }
 
     private String buildPrompt(GenerationRequest request) {
-        StringBuilder sb = new StringBuilder();
-        if (StringUtils.hasText(request.getStyle())) {
-            sb.append(request.getStyle()).append("风格，");
-        }
-        sb.append(request.getPrompt());
-        sb.append("，头像，高清，精致");
-        return sb.toString();
+        return request.getPrompt();
     }
 
     private String toJson(Map<String, Object> map) {

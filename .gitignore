@@ -42,3 +42,6 @@ application-prod.yml
 **/application-prod.yml
 
 
+docs/*
+
+

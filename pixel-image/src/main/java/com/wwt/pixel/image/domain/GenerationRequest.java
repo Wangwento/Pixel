@@ -4,6 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 @Data
 public class GenerationRequest {
 
@@ -20,9 +24,51 @@ public class GenerationRequest {
 
     private String sourceImageBase64;
 
+    private List<String> sourceImageUrls;
+
+    private List<String> sourceImageBase64List;
+
     private String size = "1024x1024";
 
     private String quality = "standard";
 
     private String vendor;
+
+    private String modelId;
+
+    private String responseFormat = "url";
+
+    private String aspectRatio;
+
+    private String imageSize;
+
+    public boolean hasSourceImages() {
+        return !resolveSourceImageUrls().isEmpty() || !resolveSourceImageBase64List().isEmpty();
+    }
+
+    public List<String> resolveSourceImageUrls() {
+        List<String> values = new ArrayList<>();
+        if (sourceImageUrls != null) {
+            sourceImageUrls.stream()
+                    .filter(url -> url != null && !url.isBlank())
+                    .forEach(values::add);
+        }
+        if (sourceImageUrl != null && !sourceImageUrl.isBlank()) {
+            values.add(sourceImageUrl);
+        }
+        return Collections.unmodifiableList(values);
+    }
+
+    public List<String> resolveSourceImageBase64List() {
+        List<String> values = new ArrayList<>();
+        if (sourceImageBase64List != null) {
+            sourceImageBase64List.stream()
+                    .filter(base64 -> base64 != null && !base64.isBlank())
+                    .forEach(values::add);
+        }
+        if (sourceImageBase64 != null && !sourceImageBase64.isBlank()) {
+            values.add(sourceImageBase64);
+        }
+        return Collections.unmodifiableList(values);
+    }
 }

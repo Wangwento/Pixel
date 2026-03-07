@@ -10,7 +10,8 @@ public enum ImageVendor {
     HUNYUAN("hunyuan", "腾讯混元", true),
     JINGDONG("jingdong", "京东云灵境", true),
     NANO_BANANA("nano-banana", "Nano Banana", true),
-    ZHIPU("zhipu", "智谱AI", true);
+    ZHIPU("zhipu", "智谱AI", true),
+    PLATO("plato", "柏拉图AI", true);
 
     private final String code;
     private final String name;

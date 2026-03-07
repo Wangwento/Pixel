@@ -517,3 +517,139 @@
 .assets-container::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* ========== 亮色主题 - 资产页 ========== */
+
+/* 标题 */
+.theme-light .assets-title h2 {
+  background: linear-gradient(135deg, #4c51bf 0%, #6b46c1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.theme-light .assets-count {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 日期选择器 */
+.theme-light .assets-filters .date-picker {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+}
+
+.theme-light .assets-filters .ant-picker-input > input {
+  color: #1a202c;
+}
+
+.theme-light .assets-filters .ant-picker-input > input::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.theme-light .assets-filters .ant-picker-suffix,
+.theme-light .assets-filters .ant-picker-separator {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.theme-light .assets-filters .ant-picker-clear {
+  background: #fff;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* 资产卡片 */
+.theme-light .asset-card {
+  background: #fff;
+  border: 1px solid #e8ecf1;
+}
+
+.theme-light .asset-card:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  border-color: rgba(76, 81, 191, 0.3);
+}
+
+/* 资产信息 */
+.theme-light .asset-prompt {
+  color: #1a202c;
+}
+
+.theme-light .asset-time {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* 加载与空状态 */
+.theme-light .loading-more {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.theme-light .no-more {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.theme-light .empty-state .ant-empty-description {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 模态框 - 通过 body[data-theme] 覆盖 Portal */
+body[data-theme="light"] .share-modal .ant-modal-content,
+body[data-theme="light"] .crop-modal .ant-modal-content,
+body[data-theme="light"] .text-modal .ant-modal-content {
+  background: #fff;
+}
+
+body[data-theme="light"] .share-modal .ant-modal-header,
+body[data-theme="light"] .crop-modal .ant-modal-header,
+body[data-theme="light"] .text-modal .ant-modal-header {
+  background: transparent;
+  border-bottom: 1px solid #e8ecf1;
+}
+
+body[data-theme="light"] .share-modal .ant-modal-title,
+body[data-theme="light"] .crop-modal .ant-modal-title,
+body[data-theme="light"] .text-modal .ant-modal-title {
+  color: #1a202c;
+}
+
+body[data-theme="light"] .share-link-input {
+  background: #f7f8fa;
+  border: 1px solid #d9d9d9;
+  color: #1a202c;
+}
+
+body[data-theme="light"] .crop-actions .ant-btn {
+  background: #f7f8fa;
+  border: 1px solid #d9d9d9;
+  color: #1a202c;
+}
+
+body[data-theme="light"] .text-modal .ant-modal-footer {
+  border-top: 1px solid #e8ecf1;
+}
+
+body[data-theme="light"] .text-modal .ant-modal-footer .ant-btn-default {
+  background: #f7f8fa;
+  border: 1px solid #d9d9d9;
+  color: #1a202c;
+}
+
+body[data-theme="light"] .text-input {
+  background: #f7f8fa;
+  border: 1px solid #d9d9d9;
+  color: #1a202c;
+}
+
+body[data-theme="light"] .text-input::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* 亮色滚动条 */
+.theme-light .assets-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.theme-light .assets-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.theme-light .assets-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}

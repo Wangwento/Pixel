@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Avatar, Popover, Button } from 'antd';
 import {
   FireOutlined,
@@ -17,6 +17,11 @@ import {
   RightOutlined,
   LeftOutlined,
   TeamOutlined,
+  ThunderboltOutlined,
+  GiftOutlined,
+  StarOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import type { MenuProps } from 'antd';
@@ -29,9 +34,26 @@ const { Sider, Content } = Layout;
 const Dashboard: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark';
+  });
   const { currentUser, logout: authLogout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('dashboard-theme', next);
+  };
+
+  // 同步主题到 body，让 Portal 组件（Popover 等）也能响应
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    return () => {
+      document.body.removeAttribute('data-theme');
+    };
+  }, [theme]);
 
   // 第一部分菜单：热门、模版、资产
   const menuItemsPart1: MenuProps['items'] = [
@@ -116,35 +138,59 @@ const Dashboard: React.FC = () => {
 
       {/* 余额信息 */}
       <div className="balance-card">
-        <div className="balance-main">
-          <span className="balance-label">总额度</span>
-          <span className="balance-value">
-            {(() => {
-              const freeQuota = currentUser?.freeQuota || 0;
-              const monthlyQuota = currentUser?.monthlyQuota || 0;
-              const monthlyQuotaUsed = currentUser?.monthlyQuotaUsed || 0;
-              const total = freeQuota + monthlyQuota - monthlyQuotaUsed;
-              console.log('[Dashboard] 额度计算:', { freeQuota, monthlyQuota, monthlyQuotaUsed, total });
-              return total;
-            })()}
-            <span className="free-quota-hint"> ({currentUser?.freeQuota || 0})</span>
-          </span>
-        </div>
-        <div className="balance-details">
-          <div className="balance-item">
-            <span>今日剩余</span>
-            <span>{currentUser?.dailyRemaining || 0}</span>
+        {/* 总额度 */}
+        <div className="quota-section">
+          <div className="quota-main">
+            <div className="quota-icon">
+              <ThunderboltOutlined />
+            </div>
+            <div className="quota-info">
+              <span className="quota-label">总额度</span>
+              <span className="quota-value">
+                {(() => {
+                  const freeQuota = currentUser?.freeQuota || 0;
+                  const monthlyQuota = currentUser?.monthlyQuota || 0;
+                  const monthlyQuotaUsed = currentUser?.monthlyQuotaUsed || 0;
+                  return freeQuota + monthlyQuota - monthlyQuotaUsed;
+                })()}
+              </span>
+            </div>
           </div>
-          <div className="balance-item">
-            <span>今日已生成</span>
-            <span>{currentUser?.dailyUsed || 0}/{currentUser?.dailyLimit || 10}</span>
-          </div>
-          <div className="balance-item">
-            <span>积分</span>
-            <span>{currentUser?.points || 0}</span>
+          <div className="quota-sub">
+            <GiftOutlined />
+            <span>免费额度: {currentUser?.freeQuota || 0}</span>
           </div>
         </div>
+
+        {/* 统计数据 */}
+        <div className="stats-grid">
+          <div className="stat-item">
+            <div className="stat-icon today">
+              <PictureOutlined />
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">今日已生成</span>
+              <span className="stat-value">
+                {currentUser?.dailyUsed || 0}
+                <span className="stat-limit">
+                  / {currentUser?.isVip ? '∞' : (currentUser?.dailyLimit || 10)}
+                </span>
+              </span>
+            </div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-icon points">
+              <StarOutlined />
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">我的积分</span>
+              <span className="stat-value">{currentUser?.points || 0}</span>
+            </div>
+          </div>
+        </div>
+
         <Button type="primary" className="recharge-btn" onClick={() => navigate('/dashboard/recharge')}>
+          <WalletOutlined />
           去充值
         </Button>
       </div>
@@ -161,7 +207,7 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="popover-menu-item" onClick={() => { setUserPopoverOpen(false); navigate('/dashboard/vip'); }}>
           <CrownOutlined />
-          <span>会员中心</span>
+          <span>会员充值</span>
         </div>
         <div className="popover-menu-item" onClick={() => { setUserPopoverOpen(false); navigate('/dashboard/orders'); }}>
           <FileTextOutlined />
@@ -187,7 +233,7 @@ const Dashboard: React.FC = () => {
   );
 
   return (
-    <Layout className="dashboard-layout">
+    <Layout className={`dashboard-layout ${theme === 'light' ? 'theme-light' : ''}`}>
       <Sider
         trigger={null}
         collapsible
@@ -197,9 +243,16 @@ const Dashboard: React.FC = () => {
         className="dashboard-sider"
       >
         {/* Logo */}
-        <div className="sider-logo" onClick={() => navigate('/')}>
-          <img src={logoSvg} alt="Pixel" className="logo-img" />
-          {!collapsed && <span className="logo-text">Pixel</span>}
+        <div className="sider-logo">
+          <div className="logo-left" onClick={() => navigate('/')}>
+            <img src={logoSvg} alt="Pixel" className="logo-img" />
+            {!collapsed && <span className="logo-text">Pixel</span>}
+          </div>
+          {!collapsed && (
+            <div className="theme-toggle" onClick={toggleTheme}>
+              {theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+            </div>
+          )}
         </div>
 
         {/* 第一部分菜单：热门、模版、资产 */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input, Button, message, Dropdown, Avatar } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -22,94 +22,99 @@ import video5 from '../../assets/封面5.mp4';
 import logoSvg from '../../assets/ip.svg';
 
 const videos = [video1, video2, video3, video4, video5];
-const VIDEO_DURATION = 8000; // 每个视频播放8秒
-const TRANSITION_DURATION = 1200; // 过渡时间1.2秒
-
-// 过渡效果类型
-type TransitionType = 'crossfade';
-const transitions: TransitionType[] = ['crossfade'];
+const VIDEO_DURATION = 8000;
+const TRANSITION_DURATION = 1200;
 
 const Home: React.FC = () => {
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
-  const [videoIndices, setVideoIndices] = useState([0, 1]);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [transitionType, setTransitionType] = useState<TransitionType>('crossfade');
-  const [showBlurPoster, setShowBlurPoster] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const { currentUser, setCurrentUser, logout: authLogout } = useAuth();
   const videoRefs = [useRef<HTMLVideoElement>(null), useRef<HTMLVideoElement>(null)];
-  const transitionCountRef = useRef(0);
   const navigate = useNavigate();
 
-  // 获取下一个过渡效果（轮流使用）
-  const getNextTransition = useCallback(() => {
-    const type = transitions[transitionCountRef.current % transitions.length];
-    transitionCountRef.current++;
-    return type;
-  }, []);
+  // 用 ref 存储可变状态，避免 useCallback/useEffect 依赖问题
+  const stateRef = useRef({
+    activeLayer: 0 as 0 | 1,
+    videoIndices: [0, 1],
+    isTransitioning: false,
+  });
+  const timersRef = useRef<number[]>([]);
 
-  // 切换到下一个视频
-  const switchToNext = useCallback(() => {
-    if (isTransitioning) return;
+  const clearAllTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
 
-    const nextLayer = activeLayer === 0 ? 1 : 0;
-    const nextVideoIndex = (videoIndices[activeLayer] + 1) % videos.length;
-    const nextType = getNextTransition();
+  const addTimer = (fn: () => void, delay: number) => {
+    const id = window.setTimeout(fn, delay);
+    timersRef.current.push(id);
+    return id;
+  };
 
-    // 更新下一层的视频
-    const newIndices = [...videoIndices];
-    newIndices[nextLayer] = nextVideoIndex;
-    setVideoIndices(newIndices);
+  // 执行切换（不依赖 React state，用 ref 读取最新值）
+  const doSwitch = (targetVideoIndex: number) => {
+    const state = stateRef.current;
+    if (state.isTransitioning) return;
 
-    // 预加载并准备播放
+    const nextLayer = state.activeLayer === 0 ? 1 : 0;
+    state.videoIndices[nextLayer] = targetVideoIndex;
+    state.isTransitioning = true;
+    setIsTransitioning(true);
+
     const nextRef = videoRefs[nextLayer].current;
-    if (nextRef) {
-      nextRef.src = videos[nextVideoIndex];
+    if (!nextRef) return;
+
+    // 只在视频源不同时才重新加载
+    const targetSrc = videos[targetVideoIndex];
+    if (nextRef.src !== targetSrc) {
+      nextRef.src = targetSrc;
       nextRef.load();
-
-      const handleCanPlay = () => {
-        nextRef.removeEventListener('canplaythrough', handleCanPlay);
-        nextRef.currentTime = 0;
-        nextRef.play().catch(() => {});
-
-        // 开始过渡
-        setTransitionType(nextType);
-        setIsTransitioning(true);
-
-        // 如果是模糊效果，先显示模糊海报
-        if (nextType === 'blur') {
-          setShowBlurPoster(true);
-          setTimeout(() => {
-            setActiveLayer(nextLayer as 0 | 1);
-            setTimeout(() => {
-              setShowBlurPoster(false);
-              setIsTransitioning(false);
-            }, TRANSITION_DURATION / 2);
-          }, TRANSITION_DURATION / 2);
-        } else {
-          // crossfade 或 blink
-          setTimeout(() => {
-            setActiveLayer(nextLayer as 0 | 1);
-          }, 50);
-
-          setTimeout(() => {
-            setIsTransitioning(false);
-          }, TRANSITION_DURATION);
-        }
-      };
-
-      nextRef.addEventListener('canplaythrough', handleCanPlay);
-
-      // 超时保护
-      setTimeout(() => {
-        nextRef.removeEventListener('canplaythrough', handleCanPlay);
-      }, 3000);
     }
-  }, [activeLayer, videoIndices, isTransitioning, getNextTransition]);
 
-  // 初始化
+    const startTransition = () => {
+      nextRef.currentTime = 0;
+      nextRef.play().catch(() => {});
+
+      addTimer(() => {
+        state.activeLayer = nextLayer as 0 | 1;
+        setActiveLayer(nextLayer as 0 | 1);
+      }, 50);
+
+      addTimer(() => {
+        state.isTransitioning = false;
+        setIsTransitioning(false);
+      }, TRANSITION_DURATION);
+    };
+
+    // 如果视频已经可以播放，直接开始
+    if (nextRef.readyState >= 3) {
+      startTransition();
+      return;
+    }
+
+    let handled = false;
+    const handleCanPlay = () => {
+      if (handled) return;
+      handled = true;
+      nextRef.removeEventListener('canplaythrough', handleCanPlay);
+      startTransition();
+    };
+
+    nextRef.addEventListener('canplaythrough', handleCanPlay);
+
+    // 超时兜底：3秒后强制切换
+    addTimer(() => {
+      if (handled) return;
+      handled = true;
+      nextRef.removeEventListener('canplaythrough', handleCanPlay);
+      startTransition();
+    }, 3000);
+  };
+
+  // 初始化：只加载一次
   useEffect(() => {
     const initRef = videoRefs[0].current;
     if (initRef) {
@@ -117,66 +122,24 @@ const Home: React.FC = () => {
       initRef.load();
       initRef.play().catch(() => {});
     }
-    // 预加载第二个视频
     const preloadRef = videoRefs[1].current;
     if (preloadRef) {
       preloadRef.src = videos[1];
       preloadRef.load();
     }
+    return () => clearAllTimers();
   }, []);
 
-  // 定时切换
+  // 定时切换：用 ref 读状态，不依赖 state
   useEffect(() => {
-    const timer = setInterval(switchToNext, VIDEO_DURATION);
+    const timer = setInterval(() => {
+      const state = stateRef.current;
+      if (state.isTransitioning) return;
+      const nextIdx = (state.videoIndices[state.activeLayer] + 1) % videos.length;
+      doSwitch(nextIdx);
+    }, VIDEO_DURATION);
     return () => clearInterval(timer);
-  }, [switchToNext]);
-
-  const handleIndicatorClick = (targetIndex: number) => {
-    const currentVideoIndex = videoIndices[activeLayer];
-    if (targetIndex === currentVideoIndex || isTransitioning) return;
-
-    const nextLayer = activeLayer === 0 ? 1 : 0;
-    const nextType = getNextTransition();
-
-    const newIndices = [...videoIndices];
-    newIndices[nextLayer] = targetIndex;
-    setVideoIndices(newIndices);
-
-    const nextRef = videoRefs[nextLayer].current;
-    if (nextRef) {
-      nextRef.src = videos[targetIndex];
-      nextRef.load();
-
-      const handleCanPlay = () => {
-        nextRef.removeEventListener('canplaythrough', handleCanPlay);
-        nextRef.currentTime = 0;
-        nextRef.play().catch(() => {});
-
-        setTransitionType(nextType);
-        setIsTransitioning(true);
-
-        if (nextType === 'blur') {
-          setShowBlurPoster(true);
-          setTimeout(() => {
-            setActiveLayer(nextLayer as 0 | 1);
-            setTimeout(() => {
-              setShowBlurPoster(false);
-              setIsTransitioning(false);
-            }, TRANSITION_DURATION / 2);
-          }, TRANSITION_DURATION / 2);
-        } else {
-          setTimeout(() => {
-            setActiveLayer(nextLayer as 0 | 1);
-          }, 50);
-          setTimeout(() => {
-            setIsTransitioning(false);
-          }, TRANSITION_DURATION);
-        }
-      };
-
-      nextRef.addEventListener('canplaythrough', handleCanPlay);
-    }
-  };
+  }, []);
 
   const handleStart = () => {
     const token = localStorage.getItem('token');
@@ -195,29 +158,6 @@ const Home: React.FC = () => {
     if (e.key === 'Enter') {
       handleStart();
     }
-  };
-
-  const currentVideoIndex = videoIndices[activeLayer];
-
-  // 获取视频的CSS类
-  const getVideoClass = (layerIndex: number) => {
-    const isActive = layerIndex === activeLayer;
-    const classes = ['bg-video'];
-
-    if (isActive) {
-      classes.push('active');
-    }
-
-    if (isTransitioning) {
-      classes.push(`transition-${transitionType}`);
-      if (isActive) {
-        classes.push('entering');
-      } else if (layerIndex === (activeLayer === 0 ? 1 : 0)) {
-        // 即将变成 active 的层
-      }
-    }
-
-    return classes.join(' ');
   };
 
   // 退出登录
@@ -283,7 +223,7 @@ const Home: React.FC = () => {
             <div className="user-info">
               <Avatar
                 src={currentUser.avatar}
-                icon={!<UserOutlined />}
+                icon={!currentUser.avatar ? <UserOutlined /> : undefined}
                 size={36}
                 className="user-avatar"
               />
@@ -307,23 +247,21 @@ const Home: React.FC = () => {
       </div>
 
       {/* 模糊海报过渡层 */}
-      <div className={`blur-poster ${showBlurPoster ? 'visible' : ''}`} />
+      <div className="blur-poster" />
 
       {/* 双层视频容器 */}
-      <div className={`video-container transition-${transitionType}`}>
+      <div className="video-container transition-crossfade">
         <video
           ref={videoRefs[0]}
           muted
-          loop
           playsInline
-          className={`bg-video ${activeLayer === 0 ? 'active' : ''} ${isTransitioning ? `transition-${transitionType}` : ''}`}
+          className={`bg-video ${activeLayer === 0 ? 'active' : ''} ${isTransitioning ? 'transition-crossfade' : ''}`}
         />
         <video
           ref={videoRefs[1]}
           muted
-          loop
           playsInline
-          className={`bg-video ${activeLayer === 1 ? 'active' : ''} ${isTransitioning ? `transition-${transitionType}` : ''}`}
+          className={`bg-video ${activeLayer === 1 ? 'active' : ''} ${isTransitioning ? 'transition-crossfade' : ''}`}
         />
         <div className="video-overlay" />
       </div>

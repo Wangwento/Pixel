@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, List, Image, Empty, Spin, Button, message, Pagination } from 'antd';
-import { DownloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { DownloadOutlined } from '@ant-design/icons';
 import { getImageHistory } from '../../api/image';
 import './index.css';
 

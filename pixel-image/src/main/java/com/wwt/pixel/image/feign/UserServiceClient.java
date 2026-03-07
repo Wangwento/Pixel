@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 /**
  * 用户服务Feign客户端
  */
-@FeignClient(name = "pixel-user", url = "${feign.client.pixel-user.url:http://localhost:8082}", path = "/api/user")
+@FeignClient(name = "pixel-user", path = "/api/user")
 public interface UserServiceClient {
 
     /**
@@ -23,4 +23,10 @@ public interface UserServiceClient {
      */
     @PostMapping("/internal/consume-quota")
     Result<String> consumeQuota(@RequestHeader("X-User-Id") Long userId);
+
+    /**
+     * 获取用户VIP等级
+     */
+    @GetMapping("/internal/vip-level")
+    Result<Integer> getVipLevel(@RequestHeader("X-User-Id") Long userId);
 }

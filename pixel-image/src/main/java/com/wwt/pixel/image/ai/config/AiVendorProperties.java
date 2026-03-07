@@ -70,11 +70,17 @@ public class AiVendorProperties {
     public static class CompatibleVendorConfig {
         private String code;
         private String name;
+        private String modelId;
+        private String modelDisplayName;
+        private int minVipLevel = 0;
         private boolean enabled = true;
+        private boolean supportsImageInput = false;
         private String apiKey;
         private String baseUrl;
         private String model = "dall-e-3";
         private int weight = 1;
         private int timeout = 60000;
+        private String aspectRatio;   // 1:1, 2:3, 3:2, 16:9 等
+        private String imageSize;     // 1K, 2K, 4K (仅nano-banana-2支持)
     }
 }

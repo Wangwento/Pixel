@@ -39,8 +39,22 @@ check_docker() {
     print_info "Docker检查通过"
 }
 
+# 获取宿主机IP并写入配置
+setup_host_ip() {
+    HOST_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
+    print_info "检测到宿主机IP: ${HOST_IP}"
+
+    # 写入 .env 供 docker-compose 使用
+    echo "HOST_IP=${HOST_IP}" > .env
+
+    # 动态替换 broker.conf 中的 brokerIP1
+    sed -i '' "s/^brokerIP1 = .*/brokerIP1 = ${HOST_IP}/" config/rocketmq/broker.conf
+    print_info "已更新 broker.conf: brokerIP1=${HOST_IP}"
+}
+
 # 启动所有服务
 start_all() {
+    setup_host_ip
     print_info "启动所有中间件..."
     docker compose up -d
     print_info "等待服务启动..."

@@ -8,6 +8,7 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import DashboardGenerate from '../pages/Dashboard/Generate';
 import Assets from '../pages/Assets';
+import Vip from '../pages/Dashboard/Vip';
 
 // 路由守卫组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -67,6 +68,14 @@ const router = createBrowserRouter([
         element: <Assets />,
       },
     ],
+  },
+  {
+    path: '/dashboard/vip',
+    element: (
+      <ProtectedRoute>
+        <Vip />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/',

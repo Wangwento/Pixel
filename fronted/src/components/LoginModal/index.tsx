@@ -258,14 +258,14 @@ const LoginModal: React.FC<LoginModalProps> = ({
       keyboard={false}
       classNames={{
         wrapper: 'login-modal-wrapper',
-        content: 'login-modal-content',
+        container: 'login-modal-content',
         body: 'login-modal-body',
       }}
       styles={{
         mask: {
           backdropFilter: 'blur(4px)',
         },
-        content: {
+        container: {
           background: 'transparent',
           boxShadow: 'none',
           padding: 0,
