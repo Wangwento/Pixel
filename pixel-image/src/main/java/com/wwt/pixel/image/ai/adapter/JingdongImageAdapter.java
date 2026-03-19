@@ -310,6 +310,10 @@ public class JingdongImageAdapter implements ImageModelAdapter {
     }
 
     private String buildPrompt(GenerationRequest request) {
-        return request.getPrompt();
+        String prompt = request.getPrompt();
+        if (StringUtils.hasText(request.getNegativePrompt())) {
+            prompt += ", avoid: " + request.getNegativePrompt();
+        }
+        return prompt;
     }
 }

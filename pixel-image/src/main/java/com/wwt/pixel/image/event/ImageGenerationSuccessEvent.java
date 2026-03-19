@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 图片生成成功事件数据
@@ -38,10 +39,14 @@ public class ImageGenerationSuccessEvent implements Serializable {
      */
     private String imageUrl;
 
+    private List<String> imageUrls;
+
     /**
      * OSS URL
      */
     private String ossUrl;
+
+    private List<String> ossUrls;
 
     /**
      * 厂商

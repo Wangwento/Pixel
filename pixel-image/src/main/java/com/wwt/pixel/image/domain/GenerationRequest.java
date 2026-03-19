@@ -7,12 +7,13 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class GenerationRequest {
 
     @NotBlank(message = "提示词不能为空")
-    @Size(max = 2000, message = "提示词最长2000字符")
+    @Size(max = 5000, message = "提示词最长5000字符")
     private String prompt;
 
     @Size(max = 1000, message = "负面提示词最长1000字符")
@@ -42,6 +43,8 @@ public class GenerationRequest {
 
     private String imageSize;
 
+    private Map<String, Object> extraParams;
+
     public boolean hasSourceImages() {
         return !resolveSourceImageUrls().isEmpty() || !resolveSourceImageBase64List().isEmpty();
     }
@@ -70,5 +73,9 @@ public class GenerationRequest {
             values.add(sourceImageBase64);
         }
         return Collections.unmodifiableList(values);
+    }
+
+    public Map<String, Object> resolveExtraParams() {
+        return extraParams == null ? Collections.emptyMap() : Collections.unmodifiableMap(extraParams);
     }
 }

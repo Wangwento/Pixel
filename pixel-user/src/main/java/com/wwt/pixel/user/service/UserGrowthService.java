@@ -3,6 +3,7 @@ package com.wwt.pixel.user.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wwt.pixel.common.constant.VerifyCodeConstants;
 import com.wwt.pixel.common.exception.BusinessException;
 import com.wwt.pixel.user.domain.GrowthActivity;
 import com.wwt.pixel.user.domain.GrowthActivityReward;
@@ -22,6 +23,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,10 +44,16 @@ public class UserGrowthService {
 
     private static final String TRIGGER_REGISTER = "register";
     private static final String TRIGGER_PROFILE_COMPLETE = "profile_complete";
+    private static final String TRIGGER_EMAIL_BIND = "email_bind";
+    private static final String TRIGGER_PHONE_BIND = "phone_bind";
+    private static final String TRIGGER_REAL_NAME_VERIFY = "real_name_verify";
     private static final String STATUS_ACTION_REQUIRED = "ACTION_REQUIRED";
     private static final String STATUS_CLAIMABLE = "CLAIMABLE";
     private static final String STATUS_CLAIMED = "CLAIMED";
     private static final String ACTION_COMPLETE_PROFILE = "COMPLETE_PROFILE";
+    private static final String ACTION_BIND_EMAIL = "BIND_EMAIL";
+    private static final String ACTION_BIND_PHONE = "BIND_PHONE";
+    private static final String ACTION_VERIFY_REAL_NAME = "VERIFY_REAL_NAME";
     private static final String ACTION_CLAIM = "CLAIM";
     private static final String ACTION_NONE = "NONE";
 
@@ -56,6 +64,7 @@ public class UserGrowthService {
     private final PointsRecordMapper pointsRecordMapper;
     private final QuotaRecordMapper quotaRecordMapper;
     private final ObjectMapper objectMapper;
+    private final StringRedisTemplate stringRedisTemplate;
 
     /**
      * 注册后创建新人礼包待领取任务
@@ -63,12 +72,15 @@ public class UserGrowthService {
     @Transactional
     public void createRegisterGiftTask(Long userId) {
         User user = userMapper.findByIdForUpdate(userId);
-        if (user == null || !shouldCreateRegisterGiftTask(user)) {
+        if (user == null) {
             return;
         }
         GrowthActivity activity = growthActivityMapper.findActiveByTriggerType(TRIGGER_REGISTER);
         if (activity == null) {
             log.warn("未找到启用中的注册礼包活动: userId={}", userId);
+            return;
+        }
+        if (!shouldCreateRegisterGiftTask(userId, activity.getId())) {
             return;
         }
         ensureGrowthRecord(userId, activity, TRIGGER_REGISTER, "auth.register");
@@ -97,14 +109,10 @@ public class UserGrowthService {
             tasks.add(toRecordTask(activity, record));
         }
 
-        GrowthActivity profileActivity = growthActivityMapper.findActiveByTriggerType(TRIGGER_PROFILE_COMPLETE);
-        if (profileActivity != null) {
-            UserGrowthRecord profileRecord = userGrowthRecordMapper.findLatestByActivityAndUser(profileActivity.getId(), userId);
-            boolean profileCompleted = user.getProfileCompleted() != null && user.getProfileCompleted() == 1;
-            if (profileRecord == null && !profileCompleted) {
-                tasks.add(toActionTask(profileActivity));
-            }
-        }
+        appendPendingTask(tasks, user, TRIGGER_PROFILE_COMPLETE, ACTION_COMPLETE_PROFILE, "user.profile.complete");
+        appendPendingTask(tasks, user, TRIGGER_EMAIL_BIND, ACTION_BIND_EMAIL, "user.profile.email");
+        appendPendingTask(tasks, user, TRIGGER_PHONE_BIND, ACTION_BIND_PHONE, "user.profile.phone");
+        appendPendingTask(tasks, user, TRIGGER_REAL_NAME_VERIFY, ACTION_VERIFY_REAL_NAME, "user.profile.real_name");
 
         tasks.sort(
                 Comparator.comparingInt(this::taskRank)
@@ -142,13 +150,133 @@ public class UserGrowthService {
             if (existing != null) {
                 return toRecordTask(activity, existing);
             }
-            throw new BusinessException("资料已完善");
+            return toRecordTask(activity, ensureGrowthRecord(userId, activity, TRIGGER_PROFILE_COMPLETE, "user.profile.complete"));
         }
 
         userMapper.updateProfile(userId, nickname, avatar, 1);
 
         UserGrowthRecord record = ensureGrowthRecord(userId, activity, TRIGGER_PROFILE_COMPLETE, "user.profile.complete");
         log.info("完善资料成功，奖励待领取: userId={}, activityCode={}", userId, activity.getActivityCode());
+        return toRecordTask(activity, record);
+    }
+
+    /**
+     * 绑定邮箱，并将奖励转为待领取任务
+     */
+    @Transactional
+    public GrowthTaskDTO bindEmailTask(Long userId, String email, String code) {
+        User user = userMapper.findByIdForUpdate(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+
+        GrowthActivity activity = growthActivityMapper.findActiveByTriggerType(TRIGGER_EMAIL_BIND);
+        if (activity == null) {
+            throw new BusinessException("当前暂无可领取的邮箱绑定奖励");
+        }
+
+        UserGrowthRecord existing = userGrowthRecordMapper.findLatestByActivityAndUser(activity.getId(), userId);
+        if (user.hasEmailVerified()) {
+            if (existing != null) {
+                return toRecordTask(activity, existing);
+            }
+            return toRecordTask(activity, ensureGrowthRecord(userId, activity, TRIGGER_EMAIL_BIND, "user.profile.email"));
+        }
+
+        User emailOwner = userMapper.findByEmail(email);
+        if (emailOwner != null && !userId.equals(emailOwner.getId())) {
+            throw new BusinessException("邮箱已被其他账号绑定");
+        }
+
+        validateAndConsumeEmailCode(email, code);
+        userMapper.updateEmail(userId, email, 1);
+        UserGrowthRecord record = ensureGrowthRecord(userId, activity, TRIGGER_EMAIL_BIND, "user.profile.email");
+        log.info("绑定邮箱成功，奖励待领取: userId={}, email={}, activityCode={}", userId, email, activity.getActivityCode());
+        return toRecordTask(activity, record);
+    }
+
+    /**
+     * 绑定手机号，并将奖励转为待领取任务
+     */
+    @Transactional
+    public GrowthTaskDTO bindPhoneTask(Long userId, String phone, String code) {
+        User user = userMapper.findByIdForUpdate(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+
+        GrowthActivity activity = growthActivityMapper.findActiveByTriggerType(TRIGGER_PHONE_BIND);
+        if (activity == null) {
+            throw new BusinessException("当前暂无可领取的手机绑定奖励");
+        }
+
+        UserGrowthRecord existing = userGrowthRecordMapper.findLatestByActivityAndUser(activity.getId(), userId);
+        if (user.hasPhoneVerified()) {
+            if (existing != null) {
+                return toRecordTask(activity, existing);
+            }
+            return toRecordTask(activity, ensureGrowthRecord(userId, activity, TRIGGER_PHONE_BIND, "user.profile.phone"));
+        }
+
+        User phoneOwner = userMapper.findByPhone(phone);
+        if (phoneOwner != null && !userId.equals(phoneOwner.getId())) {
+            throw new BusinessException("手机号已被其他账号绑定");
+        }
+
+        validateAndConsumePhoneCode(phone, code);
+        userMapper.updatePhone(userId, phone, 1);
+        UserGrowthRecord record = ensureGrowthRecord(userId, activity, TRIGGER_PHONE_BIND, "user.profile.phone");
+        log.info("绑定手机号成功，奖励待领取: userId={}, phone={}, activityCode={}", userId, phone, activity.getActivityCode());
+        return toRecordTask(activity, record);
+    }
+
+    private void validateAndConsumeEmailCode(String email, String code) {
+        String redisKey = VerifyCodeConstants.buildEmailKey(VerifyCodeConstants.SCENE_BIND_EMAIL, email);
+        validateAndConsumeCode(redisKey, code);
+    }
+
+    private void validateAndConsumePhoneCode(String phone, String code) {
+        String redisKey = VerifyCodeConstants.buildPhoneKey(VerifyCodeConstants.SCENE_BIND_PHONE, phone);
+        validateAndConsumeCode(redisKey, code);
+    }
+
+    private void validateAndConsumeCode(String redisKey, String code) {
+        String cachedCode = stringRedisTemplate.opsForValue().get(redisKey);
+        if (cachedCode == null || cachedCode.isBlank()) {
+            throw new BusinessException("验证码已过期，请重新获取");
+        }
+        if (!cachedCode.equals(code == null ? null : code.trim())) {
+            throw new BusinessException("验证码错误");
+        }
+        stringRedisTemplate.delete(redisKey);
+    }
+
+    /**
+     * 实名认证，并将奖励转为待领取任务
+     */
+    @Transactional
+    public GrowthTaskDTO verifyRealNameTask(Long userId, String realName, String idCard) {
+        User user = userMapper.findByIdForUpdate(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+
+        GrowthActivity activity = growthActivityMapper.findActiveByTriggerType(TRIGGER_REAL_NAME_VERIFY);
+        if (activity == null) {
+            throw new BusinessException("当前暂无可领取的实名认证奖励");
+        }
+
+        UserGrowthRecord existing = userGrowthRecordMapper.findLatestByActivityAndUser(activity.getId(), userId);
+        if (user.hasRealNameVerified()) {
+            if (existing != null) {
+                return toRecordTask(activity, existing);
+            }
+            return toRecordTask(activity, ensureGrowthRecord(userId, activity, TRIGGER_REAL_NAME_VERIFY, "user.profile.real_name"));
+        }
+
+        userMapper.updateRealName(userId, realName, idCard, User.VerifyStatus.VERIFIED);
+        UserGrowthRecord record = ensureGrowthRecord(userId, activity, TRIGGER_REAL_NAME_VERIFY, "user.profile.real_name");
+        log.info("实名认证成功，奖励待领取: userId={}, realName={}, activityCode={}", userId, realName, activity.getActivityCode());
         return toRecordTask(activity, record);
     }
 
@@ -232,19 +360,54 @@ public class UserGrowthService {
     }
 
     private void ensureRegisterGiftTaskIfNeeded(User user) {
-        if (!shouldCreateRegisterGiftTask(user)) {
-            return;
-        }
         GrowthActivity activity = growthActivityMapper.findActiveByTriggerType(TRIGGER_REGISTER);
         if (activity == null) {
+            return;
+        }
+        if (!shouldCreateRegisterGiftTask(user.getId(), activity.getId())) {
             return;
         }
         ensureGrowthRecord(user.getId(), activity, TRIGGER_REGISTER, "user.growth.list");
     }
 
-    private boolean shouldCreateRegisterGiftTask(User user) {
-        return (user.getTotalPoints() == null || user.getTotalPoints() == 0)
-                && (user.getFreeQuotaTotal() == null || user.getFreeQuotaTotal() == 0);
+    private boolean shouldCreateRegisterGiftTask(Long userId, Long activityId) {
+        return userGrowthRecordMapper.findByActivityAndUserAndBizKey(activityId, userId, TRIGGER_REGISTER) == null;
+    }
+
+    private void appendPendingTask(List<GrowthTaskDTO> tasks, User user, String triggerType,
+                                   String actionType, String triggerSource) {
+        GrowthActivity activity = growthActivityMapper.findActiveByTriggerType(triggerType);
+        if (activity == null) {
+            return;
+        }
+
+        UserGrowthRecord existingRecord = userGrowthRecordMapper.findLatestByActivityAndUser(activity.getId(), user.getId());
+        if (existingRecord != null) {
+            return;
+        }
+
+        if (isTaskCompleted(user, triggerType)) {
+            tasks.add(toRecordTask(activity, ensureGrowthRecord(user.getId(), activity, triggerType, triggerSource)));
+            return;
+        }
+
+        tasks.add(toActionTask(activity, actionType));
+    }
+
+    private boolean isTaskCompleted(User user, String triggerType) {
+        if (TRIGGER_PROFILE_COMPLETE.equals(triggerType)) {
+            return user.getProfileCompleted() != null && user.getProfileCompleted() == 1;
+        }
+        if (TRIGGER_EMAIL_BIND.equals(triggerType)) {
+            return user.hasEmailVerified();
+        }
+        if (TRIGGER_PHONE_BIND.equals(triggerType)) {
+            return user.hasPhoneVerified();
+        }
+        if (TRIGGER_REAL_NAME_VERIFY.equals(triggerType)) {
+            return user.hasRealNameVerified();
+        }
+        return false;
     }
 
     private UserGrowthRecord ensureGrowthRecord(Long userId, GrowthActivity activity, String bizKey, String triggerSource) {
@@ -292,7 +455,7 @@ public class UserGrowthService {
                 .build();
     }
 
-    private GrowthTaskDTO toActionTask(GrowthActivity activity) {
+    private GrowthTaskDTO toActionTask(GrowthActivity activity, String actionType) {
         List<RewardSnapshotItem> rewards = buildRewardSnapshot(activity.getId());
         return GrowthTaskDTO.builder()
                 .activityCode(activity.getActivityCode())
@@ -300,7 +463,7 @@ public class UserGrowthService {
                 .description(activity.getDescription())
                 .triggerType(activity.getTriggerType())
                 .status(STATUS_ACTION_REQUIRED)
-                .actionType(ACTION_COMPLETE_PROFILE)
+                .actionType(actionType)
                 .rewardSummary(toRewardSummary(rewards))
                 .createdAt(LocalDateTime.now())
                 .build();

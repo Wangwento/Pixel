@@ -11,14 +11,13 @@ import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class NacosVendorConfigListener {
 
@@ -91,39 +90,97 @@ public class NacosVendorConfigListener {
                 new AiVendorProperties.CompatibleVendorConfig();
         config.setCode(dto.getCode());
         config.setName(dto.getName());
-        config.setModelId(dto.getModelId());
+        config.setModelCode(dto.resolveModelCode());
         config.setModelDisplayName(dto.getModelDisplayName());
         config.setMinVipLevel(dto.getMinVipLevel());
         config.setEnabled(dto.isEnabled());
         config.setApiKey(dto.getApiKey());
         config.setBaseUrl(dto.getBaseUrl());
-        config.setModel(dto.getModel() != null
-                ? dto.getModel() : "dall-e-3");
+        config.setProviderModel(dto.resolveProviderModel());
         config.setWeight(
                 dto.getWeight() > 0 ? dto.getWeight() : 1);
         config.setTimeout(
                 dto.getTimeout() > 0 ? dto.getTimeout() : 60000);
         config.setSupportsImageInput(dto.isSupportsImageInput());
+        config.setCostPerUnit(resolveCostPerUnit(dto));
         config.setAspectRatio(dto.getAspectRatio());
         config.setImageSize(dto.getImageSize());
         return config;
+    }
+
+    private BigDecimal resolveCostPerUnit(VendorConfigDTO dto) {
+        if (dto.getCostPerUnit() != null && dto.getCostPerUnit().signum() > 0) {
+            return dto.getCostPerUnit();
+        }
+        if (dto.getCostPerImage() != null && dto.getCostPerImage().signum() > 0) {
+            return dto.getCostPerImage();
+        }
+        return dto.getCostPerUnit() != null ? dto.getCostPerUnit() : BigDecimal.ZERO;
     }
 
     @Data
     public static class VendorConfigDTO {
         private String code;
         private String name;
+        /**
+         * 规范字段：平台内部模型编码，对应 ai_model.model_code。
+         */
+        private String modelCode;
+        /**
+         * 兼容旧字段：历史上使用 modelId 表示平台内部模型编码。
+         */
         private String modelId;
+        /**
+         * 规范字段：发给上游供应商请求体中的 model 参数。
+         */
+        private String providerModel;
+        /**
+         * 兼容旧字段：历史上使用 model 表示上游请求参数。
+         */
+        private String model;
         private String modelDisplayName;
         private int minVipLevel = 0;
         private boolean enabled = true;
         private String apiKey;
         private String baseUrl;
-        private String model;
         private int weight = 1;
         private int timeout = 60000;
+        private BigDecimal costPerUnit = BigDecimal.ZERO;
+        private BigDecimal costPerImage = BigDecimal.ZERO;
         private boolean supportsImageInput = false;
         private String aspectRatio;
         private String imageSize;
+
+        public String resolveModelCode() {
+            if (modelCode != null && !modelCode.isBlank()) {
+                return modelCode;
+            }
+            if (modelId != null && !modelId.isBlank()) {
+                return modelId;
+            }
+            if (providerModel != null && !providerModel.isBlank()) {
+                return providerModel;
+            }
+            if (model != null && !model.isBlank()) {
+                return model;
+            }
+            return null;
+        }
+
+        public String resolveProviderModel() {
+            if (providerModel != null && !providerModel.isBlank()) {
+                return providerModel;
+            }
+            if (model != null && !model.isBlank()) {
+                return model;
+            }
+            if (modelCode != null && !modelCode.isBlank()) {
+                return modelCode;
+            }
+            if (modelId != null && !modelId.isBlank()) {
+                return modelId;
+            }
+            return "dall-e-3";
+        }
     }
 }

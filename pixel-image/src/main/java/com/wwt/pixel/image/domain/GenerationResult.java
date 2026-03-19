@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,10 +27,16 @@ public class GenerationResult {
 
     private String imageBase64;
 
+    private List<String> imageUrls;
+
+    private List<String> imageBase64List;
+
     /**
      * OSS存储URL（持久化存储）
      */
     private String ossUrl;
+
+    private List<String> ossUrls;
 
     private String revisedPrompt;
 

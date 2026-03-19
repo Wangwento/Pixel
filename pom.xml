@@ -22,6 +22,9 @@
         <module>pixel-auth</module>
         <module>pixel-user</module>
         <module>pixel-image</module>
+        <module>pixel-vedio</module>
+        <module>pixel-audio</module>
+        <module>pixel-admin</module>
     </modules>
 
     <properties>

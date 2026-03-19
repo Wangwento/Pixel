@@ -4,10 +4,13 @@ import com.wwt.pixel.common.exception.BusinessException;
 import com.wwt.pixel.image.domain.GenerationRequest;
 import com.wwt.pixel.image.domain.GenerationResult;
 import com.wwt.pixel.image.dto.ModelInfo;
+import com.wwt.pixel.image.dto.ModelParamInfo;
 import com.wwt.pixel.image.ai.ImageGenerationService;
 import com.wwt.pixel.image.ai.adapter.GeminiChatImageAdapter;
+import com.wwt.pixel.image.ai.adapter.JsonImageGenerationsAdapter;
 import com.wwt.pixel.image.ai.adapter.OpenAiCompatibleAdapter;
 import com.wwt.pixel.image.ai.adapter.PlatoImageAdapter;
+import com.wwt.pixel.image.ai.config.CompatibleImageAdapterFactory;
 import com.wwt.pixel.image.ai.config.AiVendorProperties;
 import com.wwt.pixel.image.infrastructure.oss.OssStorageService;
 import jakarta.annotation.PostConstruct;
@@ -16,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -23,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,6 +35,15 @@ public class MultiVendorImageService implements ImageGenerationService {
 
     // volatile 引用，支持运行时原子替换
     private volatile List<ImageModelAdapter> allAdapters;
+    private volatile List<AiVendorProperties.CompatibleVendorConfig> nacosVendorConfigs = new ArrayList<>();
+
+    // 本地缓存：模型参数映射
+    private volatile Map<String, List<ModelParamInfo>> cachedModelParamsMap = new LinkedHashMap<>();
+    // 本地缓存：模型是否支持图片输入
+    private volatile Map<String, Boolean> cachedSupportsImageInputMap = new LinkedHashMap<>();
+    // 本地缓存：模型单次生成价格
+    private volatile Map<String, BigDecimal> cachedCostPerUnitMap = new LinkedHashMap<>();
+
     private final AiVendorProperties properties;
     private final OssStorageService ossStorageService;
 
@@ -75,6 +89,9 @@ public class MultiVendorImageService implements ImageGenerationService {
         if (adapter instanceof GeminiChatImageAdapter a) {
             return a.getVendorName();
         }
+        if (adapter instanceof JsonImageGenerationsAdapter a) {
+            return a.getVendorName();
+        }
         if (adapter instanceof PlatoImageAdapter a) {
             return a.getVendorName();
         }
@@ -83,6 +100,9 @@ public class MultiVendorImageService implements ImageGenerationService {
 
     private String getAdapterCode(ImageModelAdapter adapter) {
         if (adapter instanceof OpenAiCompatibleAdapter a) {
+            return a.getVendorCode();
+        }
+        if (adapter instanceof JsonImageGenerationsAdapter a) {
             return a.getVendorCode();
         }
         if (adapter instanceof PlatoImageAdapter a) {
@@ -222,23 +242,43 @@ public class MultiVendorImageService implements ImageGenerationService {
      */
     public List<ModelInfo> getModelList(int userVipLevel) {
         Map<String, ModelInfo> modelMap = new LinkedHashMap<>();
+
+        // 使用本地缓存的数据
+        Map<String, List<ModelParamInfo>> modelParamsMap = cachedModelParamsMap;
+        Map<String, Boolean> modelSupportsImageInputMap = cachedSupportsImageInputMap;
+        Map<String, BigDecimal> modelCostPerUnitMap = cachedCostPerUnitMap;
+
         for (ImageModelAdapter adapter : allAdapters) {
             if (!adapter.isAvailable()) continue;
             String mid = adapter.getModelId();
             if (mid == null || mid.isBlank()) continue;
-            if (modelMap.containsKey(mid)) continue;
             ModelInfo existing = modelMap.get(mid);
+            boolean supportsImageInput = modelSupportsImageInputMap.getOrDefault(mid, adapter.supportsImageInput());
             if (existing == null) {
                 modelMap.put(mid, ModelInfo.builder()
                         .modelId(mid)
                         .displayName(adapter.getModelDisplayName())
                         .minVipLevel(adapter.getMinVipLevel())
                         .available(userVipLevel >= adapter.getMinVipLevel())
-                        .imageToImageSupported(adapter.supportsImageInput())
+                        .costPerUnit(modelCostPerUnitMap.get(mid))
+                        .supportsImageInput(supportsImageInput)
+                        .params(modelParamsMap.get(mid))
                         .build());
                 continue;
             }
-            existing.setImageToImageSupported(existing.isImageToImageSupported() || adapter.supportsImageInput());
+            existing.setAvailable(existing.isAvailable() || userVipLevel >= adapter.getMinVipLevel());
+            existing.setMinVipLevel(Math.min(existing.getMinVipLevel(), adapter.getMinVipLevel()));
+            existing.setSupportsImageInput(existing.isSupportsImageInput() || supportsImageInput);
+            if (!StringUtils.hasText(existing.getDisplayName()) && StringUtils.hasText(adapter.getModelDisplayName())) {
+                existing.setDisplayName(adapter.getModelDisplayName());
+            }
+            if (existing.getParams() == null && modelParamsMap.get(mid) != null) {
+                existing.setParams(modelParamsMap.get(mid));
+            }
+            if ((existing.getCostPerUnit() == null || existing.getCostPerUnit().signum() <= 0)
+                    && modelCostPerUnitMap.get(mid) != null) {
+                existing.setCostPerUnit(modelCostPerUnitMap.get(mid));
+            }
         }
         return new ArrayList<>(modelMap.values());
     }
@@ -287,6 +327,65 @@ public class MultiVendorImageService implements ImageGenerationService {
      * 整体替换 allAdapters 引用，保证线程安全
      */
     public void refreshVendors(List<AiVendorProperties.CompatibleVendorConfig> vendorConfigs) {
+        // 保存配置供 getModelList 使用
+        this.nacosVendorConfigs = new ArrayList<>(vendorConfigs);
+
+        // 构建本地缓存
+        Map<String, List<ModelParamInfo>> paramsMap = new LinkedHashMap<>();
+        Map<String, Boolean> supportsInputMap = new LinkedHashMap<>();
+        Map<String, BigDecimal> costPerUnitMap = new LinkedHashMap<>();
+
+        for (AiVendorProperties.CompatibleVendorConfig vendor : vendorConfigs) {
+            String modelId = CompatibleImageAdapterFactory.resolveModelCode(vendor);
+            if (!StringUtils.hasText(modelId)) {
+                continue;
+            }
+
+            // 缓存 supportsImageInput
+            supportsInputMap.merge(modelId,
+                    CompatibleImageAdapterFactory.supportsImageInput(vendor),
+                    Boolean::logicalOr);
+
+            BigDecimal costPerUnit = vendor.getCostPerUnit();
+            if (costPerUnit != null) {
+                costPerUnitMap.merge(modelId, costPerUnit, (existing, incoming) -> {
+                    if (existing == null || existing.signum() <= 0) {
+                        return incoming;
+                    }
+                    if (incoming == null || incoming.signum() <= 0) {
+                        return existing;
+                    }
+                    return existing.min(incoming);
+                });
+            }
+
+            // 缓存参数
+            if (vendor.getParams() != null && !vendor.getParams().isEmpty()) {
+                List<ModelParamInfo> paramInfos = vendor.getParams().stream()
+                    .map(p -> ModelParamInfo.builder()
+                        .paramKey(p.getParamKey())
+                        .paramName(p.getParamName())
+                        .paramType(p.getParamType())
+                        .required(p.getRequired())
+                        .visible(p.getVisible())
+                        .defaultValue(p.getDefaultValue())
+                        .options(p.getOptions())
+                        .validationRule(p.getValidationRule())
+                        .description(p.getDescription())
+                        .displayOrder(p.getDisplayOrder())
+                        .build())
+                    .collect(Collectors.toList());
+                paramsMap.put(modelId, paramInfos);
+            }
+        }
+
+        // 原子更新缓存
+        this.cachedModelParamsMap = paramsMap;
+        this.cachedSupportsImageInputMap = supportsInputMap;
+        this.cachedCostPerUnitMap = costPerUnitMap;
+
+        log.info("已更新本地缓存: {} 个模型配置", vendorConfigs.size());
+
         List<ImageModelAdapter> newAdapters = new ArrayList<>();
         for (AiVendorProperties.CompatibleVendorConfig vendor : vendorConfigs) {
             if (!vendor.isEnabled()) {
@@ -298,33 +397,7 @@ public class MultiVendorImageService implements ImageGenerationService {
                 continue;
             }
 
-            String modelName = vendor.getModel() != null ? vendor.getModel() : "dall-e-3";
-            boolean supportsImageInput = vendor.isSupportsImageInput();
-            ImageModelAdapter adapter;
-            if (modelName.toLowerCase().contains("gemini")) {
-                adapter = new GeminiChatImageAdapter(
-                        vendor.getCode(),
-                        vendor.getName() != null ? vendor.getName() : vendor.getCode(),
-                        vendor.getApiKey(), vendor.getBaseUrl(), modelName,
-                        vendor.getWeight(), vendor.getTimeout(),
-                        vendor.getModelId(), vendor.getModelDisplayName(), vendor.getMinVipLevel());
-            } else if (vendor.getName().equals("柏拉图AI")) {
-                adapter = new PlatoImageAdapter(
-                        vendor.getCode(),
-                        vendor.getName(),
-                        vendor.getApiKey(), vendor.getBaseUrl(), modelName,
-                        vendor.getWeight(), vendor.getTimeout(),
-                        vendor.getModelId(), vendor.getModelDisplayName(),
-                        vendor.getMinVipLevel(),
-                        vendor.getAspectRatio(), vendor.getImageSize());
-            } else {
-                adapter = new OpenAiCompatibleAdapter(
-                        vendor.getCode(),
-                        vendor.getName(),
-                        vendor.getApiKey(), vendor.getBaseUrl(), modelName,
-                        vendor.getWeight(), vendor.getTimeout(),
-                        vendor.getModelId(), vendor.getModelDisplayName(), vendor.getMinVipLevel());
-            }
+            ImageModelAdapter adapter = CompatibleImageAdapterFactory.createAdapter(vendor);
             newAdapters.add(adapter);
         }
 
@@ -344,20 +417,48 @@ public class MultiVendorImageService implements ImageGenerationService {
         }
 
         try {
-            String ossUrl = null;
+            normalizePrimaryImageFields(result);
 
-            // 优先上传Base64图片
-            if (StringUtils.hasText(result.getImageBase64())) {
-                ossUrl = ossStorageService.uploadBase64Image(result.getImageBase64());
-            }
-            // 如果没有Base64，则从URL下载并上传
-            else if (StringUtils.hasText(result.getImageUrl())) {
-                ossUrl = ossStorageService.uploadFromUrl(result.getImageUrl());
+            List<String> ossUrls = new ArrayList<>();
+            List<String> imageBase64List = result.getImageBase64List();
+            List<String> imageUrlList = result.getImageUrls();
+
+            if (imageBase64List != null && !imageBase64List.isEmpty()) {
+                for (String imageBase64 : imageBase64List) {
+                    if (!StringUtils.hasText(imageBase64)) {
+                        continue;
+                    }
+                    String uploaded = ossStorageService.uploadBase64Image(imageBase64);
+                    if (uploaded != null) {
+                        ossUrls.add(uploaded);
+                    }
+                }
+            } else if (imageUrlList != null && !imageUrlList.isEmpty()) {
+                for (String imageUrl : imageUrlList) {
+                    if (!StringUtils.hasText(imageUrl)) {
+                        continue;
+                    }
+                    String uploaded = ossStorageService.uploadFromUrl(imageUrl);
+                    if (uploaded != null) {
+                        ossUrls.add(uploaded);
+                    }
+                }
+            } else if (StringUtils.hasText(result.getImageBase64())) {
+                String uploaded = ossStorageService.uploadBase64Image(result.getImageBase64());
+                if (uploaded != null) {
+                    ossUrls.add(uploaded);
+                }
+            } else if (StringUtils.hasText(result.getImageUrl())) {
+                String uploaded = ossStorageService.uploadFromUrl(result.getImageUrl());
+                if (uploaded != null) {
+                    ossUrls.add(uploaded);
+                }
             }
 
-            if (ossUrl != null) {
-                result.setOssUrl(ossUrl);
-                log.info("图片已上传到OSS: {}", ossUrl);
+            if (!ossUrls.isEmpty()) {
+                result.setOssUrls(ossUrls);
+                result.setOssUrl(ossUrls.get(0));
+                log.info("图片已上传到OSS: {}", ossUrls);
             }
         } catch (Exception e) {
             log.error("上传图片到OSS失败", e);
@@ -365,5 +466,31 @@ public class MultiVendorImageService implements ImageGenerationService {
         }
 
         return result;
+    }
+
+    private void normalizePrimaryImageFields(GenerationResult result) {
+        if ((result.getImageUrls() == null || result.getImageUrls().isEmpty())
+                && StringUtils.hasText(result.getImageUrl())) {
+            result.setImageUrls(List.of(result.getImageUrl()));
+        } else if (!StringUtils.hasText(result.getImageUrl())
+                && result.getImageUrls() != null
+                && !result.getImageUrls().isEmpty()) {
+            result.setImageUrl(result.getImageUrls().get(0));
+        }
+
+        if ((result.getImageBase64List() == null || result.getImageBase64List().isEmpty())
+                && StringUtils.hasText(result.getImageBase64())) {
+            result.setImageBase64List(List.of(result.getImageBase64()));
+        } else if (!StringUtils.hasText(result.getImageBase64())
+                && result.getImageBase64List() != null
+                && !result.getImageBase64List().isEmpty()) {
+            result.setImageBase64(result.getImageBase64List().get(0));
+        }
+
+        if (!StringUtils.hasText(result.getOssUrl())
+                && result.getOssUrls() != null
+                && !result.getOssUrls().isEmpty()) {
+            result.setOssUrl(result.getOssUrls().get(0));
+        }
     }
 }

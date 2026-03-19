@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wwt.pixel.audio.mapper.AudioAssetMapper">
+
+    <sql id="whereCondition">
+        WHERE user_id = #{userId}
+        <if test="folderId != null">
+            AND folder_id = #{folderId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (title LIKE CONCAT('%', #{keyword}, '%') OR prompt LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="startDate != null and startDate != ''">
+            AND created_at &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND created_at &lt;= CONCAT(#{endDate}, ' 23:59:59')
+        </if>
+    </sql>
+
+    <select id="countByUser" resultType="int">
+        SELECT COUNT(*) FROM audio_asset
+        <include refid="whereCondition"/>
+    </select>
+
+    <select id="selectByUser" resultType="com.wwt.pixel.audio.domain.AudioAsset">
+        SELECT * FROM audio_asset
+        <include refid="whereCondition"/>
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>

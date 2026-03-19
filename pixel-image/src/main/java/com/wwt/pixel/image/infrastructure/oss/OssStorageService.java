@@ -107,10 +107,24 @@ public class OssStorageService {
         }
 
         try {
+            log.info("开始从URL流式转存图片: {}", imageUrl);
             URL url = new URL(imageUrl);
-            try (InputStream inputStream = url.openStream()) {
+            var connection = url.openConnection();
+            connection.setConnectTimeout(10000); // 连接超时10秒
+            connection.setReadTimeout(60000); // 读取超时60秒（大图片需要更长时间）
+
+            try (InputStream inputStream = connection.getInputStream()) {
+                long contentLength = connection.getContentLengthLong();
+                String contentType = normalizeContentType(connection.getContentType(), imageUrl);
+
+                if (contentLength > 0) {
+                    log.info("图片响应头获取成功，大小: {} KB, Content-Type: {}", contentLength / 1024, contentType);
+                    return uploadStream(inputStream, contentLength, contentType, getFileExtension(contentType));
+                }
+
+                log.warn("图片响应未提供Content-Length，回退为内存上传: {}", imageUrl);
                 byte[] imageBytes = inputStream.readAllBytes();
-                String contentType = guessContentType(imageUrl);
+                log.info("图片下载完成，大小: {} KB", imageBytes.length / 1024);
                 return uploadBytes(imageBytes, contentType, getFileExtension(contentType));
             }
         } catch (Exception e) {
@@ -140,6 +154,30 @@ public class OssStorageService {
         ossClient.putObject(putRequest);
         String accessUrl = buildAccessUrl(objectKey);
         log.info("图片上传成功: {}", accessUrl);
+
+        return accessUrl;
+    }
+
+    /**
+     * 流式上传到OSS，避免整张图读入堆内存
+     */
+    private String uploadStream(InputStream inputStream, long contentLength, String contentType, String extension) {
+        String objectKey = generateObjectKey(extension);
+
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(contentType);
+        metadata.setContentLength(contentLength);
+
+        PutObjectRequest putRequest = new PutObjectRequest(
+                ossProperties.getBucketName(),
+                objectKey,
+                inputStream,
+                metadata
+        );
+
+        ossClient.putObject(putRequest);
+        String accessUrl = buildAccessUrl(objectKey);
+        log.info("图片流式上传成功: {}", accessUrl);
 
         return accessUrl;
     }
@@ -197,6 +235,18 @@ public class OssStorageService {
         return "image/png";
     }
 
+    private String normalizeContentType(String contentType, String imageUrl) {
+        if (!StringUtils.hasText(contentType)) {
+            return guessContentType(imageUrl);
+        }
+
+        String normalized = contentType.split(";", 2)[0].trim().toLowerCase();
+        if (!normalized.startsWith("image/")) {
+            return guessContentType(imageUrl);
+        }
+        return normalized;
+    }
+
     private String getFileExtension(String contentType) {
         return switch (contentType) {
             case "image/jpeg" -> "jpg";
@@ -204,5 +254,69 @@ public class OssStorageService {
             case "image/gif" -> "gif";
             default -> "png";
         };
+    }
+
+    /**
+     * 上传临时图片（用于参数传递）
+     */
+    public String uploadTempImage(org.springframework.web.multipart.MultipartFile file) {
+        if (!enabled) {
+            throw new RuntimeException("OSS存储服务未启用");
+        }
+
+        try {
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".")
+                    ? originalFilename.substring(originalFilename.lastIndexOf(".") + 1)
+                    : "jpg";
+
+            // 临时文件路径: temp/YYYY/MM/DD/uuid.ext
+            String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+            String objectKey = "temp/" + datePath + "/" + UUID.randomUUID() + "." + extension;
+
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(file.getContentType());
+            metadata.setContentLength(file.getSize());
+
+            ossClient.putObject(ossProperties.getBucketName(), objectKey, file.getInputStream(), metadata);
+            return buildAccessUrl(objectKey);
+        } catch (Exception e) {
+            log.error("上传临时图片失败", e);
+            throw new RuntimeException("上传失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除临时图片
+     */
+    public void deleteTempImage(String url) {
+        if (!enabled || !StringUtils.hasText(url)) {
+            return;
+        }
+
+        try {
+            String objectKey = extractObjectKey(url);
+            if (objectKey != null && objectKey.startsWith("temp/")) {
+                ossClient.deleteObject(ossProperties.getBucketName(), objectKey);
+                log.info("临时图片删除成功: {}", objectKey);
+            }
+        } catch (Exception e) {
+            log.error("删除临时图片失败: {}", url, e);
+        }
+    }
+
+    /**
+     * 从URL提取objectKey
+     */
+    private String extractObjectKey(String url) {
+        if (!StringUtils.hasText(url)) {
+            return null;
+        }
+        int idx = url.indexOf(ossProperties.getBucketName());
+        if (idx > 0) {
+            String path = url.substring(idx + ossProperties.getBucketName().length());
+            return path.startsWith("/") ? path.substring(1) : path;
+        }
+        return null;
     }
 }

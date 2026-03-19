@@ -15,8 +15,10 @@ public class User {
     private String nickname;
     private String avatar;
     private String email;
+    private Integer emailVerified;
     private String phone;
     private Integer phoneVerified;
+    private String realName;
     private Integer realNameVerified;
     private Integer points;
     private Integer totalPoints;

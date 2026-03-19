@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `nickname` VARCHAR(50) COMMENT '昵称',
     `avatar` VARCHAR(255) COMMENT '头像URL',
     `email` VARCHAR(100) COMMENT '邮箱',
+    `email_verified` TINYINT NOT NULL DEFAULT 0 COMMENT '邮箱认证: 0-未认证, 1-已认证',
     `phone` VARCHAR(20) COMMENT '手机号',
     `phone_verified` TINYINT NOT NULL DEFAULT 0 COMMENT '手机认证: 0-未认证, 1-已认证',
     `real_name` VARCHAR(50) COMMENT '真实姓名',
@@ -70,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `points_record` (
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
     `points` INT NOT NULL COMMENT '积分变动',
     `balance` INT NOT NULL COMMENT '变动后余额',
-    `type` TINYINT NOT NULL COMMENT '类型',
+    `type` TINYINT NOT NULL COMMENT '类型: 1-签到, 2-任务奖励, 3-兑换额度, 4-充值, 5-退款, 6-系统调整, 7-观看广告, 8-邀请奖励, 9-分享奖励, 10-完善资料, 11-新人礼包, 12-成长活动',
     `source` VARCHAR(50) COMMENT '来源标识',
     `description` VARCHAR(200) COMMENT '描述',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -84,7 +85,7 @@ CREATE TABLE IF NOT EXISTS `quota_record` (
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
     `quota` INT NOT NULL COMMENT '额度变动',
     `balance` INT NOT NULL COMMENT '变动后余额',
-    `type` TINYINT NOT NULL COMMENT '类型',
+    `type` TINYINT NOT NULL COMMENT '类型: 1-生成消耗, 2-积分兑换, 3-VIP赠送, 4-购买, 5-系统调整, 6-每日重置, 7-成长活动',
     `source` VARCHAR(50) COMMENT '来源标识',
     `description` VARCHAR(200) COMMENT '描述',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -140,7 +141,7 @@ CREATE TABLE IF NOT EXISTS `growth_activity` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT 'ID',
     `activity_code` VARCHAR(32) NOT NULL COMMENT '活动编码',
     `activity_name` VARCHAR(100) NOT NULL COMMENT '活动名称',
-    `trigger_type` VARCHAR(30) NOT NULL COMMENT '触发类型: register/profile_complete/first_generate/invite_success/manual',
+    `trigger_type` VARCHAR(30) NOT NULL COMMENT '触发类型: register/profile_complete/email_bind/phone_bind/real_name_verify/first_generate/invite_success/manual',
     `description` VARCHAR(255) COMMENT '活动描述',
     `start_time` DATETIME COMMENT '开始时间，空表示立即生效',
     `end_time` DATETIME COMMENT '结束时间，空表示长期有效',
@@ -230,6 +231,7 @@ INSERT INTO `growth_activity`
 VALUES
 ('profile-complete-gift', '完善资料奖励', 'profile_complete', '完善昵称和头像后可在通知中心手动领取奖励', 1, 1, 0, 20)
 ON DUPLICATE KEY UPDATE
+    `trigger_type` = VALUES(`trigger_type`),
     `activity_name` = VALUES(`activity_name`),
     `description` = VALUES(`description`),
     `status` = VALUES(`status`),
@@ -242,6 +244,78 @@ INSERT INTO `growth_activity_reward`
 SELECT `id`, 'points', 50, 'points', 0, 1, 10
 FROM `growth_activity`
 WHERE `activity_code` = 'profile-complete-gift'
+ON DUPLICATE KEY UPDATE
+    `reward_value` = VALUES(`reward_value`),
+    `reward_unit` = VALUES(`reward_unit`),
+    `expire_days` = VALUES(`expire_days`),
+    `status` = VALUES(`status`);
+
+INSERT INTO `growth_activity`
+(`activity_code`, `activity_name`, `trigger_type`, `description`, `status`, `once_per_user`, `auto_grant`, `priority`)
+VALUES
+('bind-email-gift', '绑定邮箱奖励', 'email_bind', '绑定邮箱后可在通知中心手动领取奖励', 1, 1, 0, 30)
+ON DUPLICATE KEY UPDATE
+    `trigger_type` = VALUES(`trigger_type`),
+    `activity_name` = VALUES(`activity_name`),
+    `description` = VALUES(`description`),
+    `status` = VALUES(`status`),
+    `once_per_user` = VALUES(`once_per_user`),
+    `auto_grant` = VALUES(`auto_grant`),
+    `priority` = VALUES(`priority`);
+
+INSERT INTO `growth_activity_reward`
+(`activity_id`, `reward_type`, `reward_value`, `reward_unit`, `expire_days`, `status`, `sort_order`)
+SELECT `id`, 'points', 20, 'points', 0, 1, 10
+FROM `growth_activity`
+WHERE `activity_code` = 'bind-email-gift'
+ON DUPLICATE KEY UPDATE
+    `reward_value` = VALUES(`reward_value`),
+    `reward_unit` = VALUES(`reward_unit`),
+    `expire_days` = VALUES(`expire_days`),
+    `status` = VALUES(`status`);
+
+INSERT INTO `growth_activity`
+(`activity_code`, `activity_name`, `trigger_type`, `description`, `status`, `once_per_user`, `auto_grant`, `priority`)
+VALUES
+('bind-phone-gift', '绑定手机号奖励', 'phone_bind', '绑定手机号后可在通知中心手动领取奖励', 1, 1, 0, 40)
+ON DUPLICATE KEY UPDATE
+    `trigger_type` = VALUES(`trigger_type`),
+    `activity_name` = VALUES(`activity_name`),
+    `description` = VALUES(`description`),
+    `status` = VALUES(`status`),
+    `once_per_user` = VALUES(`once_per_user`),
+    `auto_grant` = VALUES(`auto_grant`),
+    `priority` = VALUES(`priority`);
+
+INSERT INTO `growth_activity_reward`
+(`activity_id`, `reward_type`, `reward_value`, `reward_unit`, `expire_days`, `status`, `sort_order`)
+SELECT `id`, 'quota', 3, 'quota', 0, 1, 10
+FROM `growth_activity`
+WHERE `activity_code` = 'bind-phone-gift'
+ON DUPLICATE KEY UPDATE
+    `reward_value` = VALUES(`reward_value`),
+    `reward_unit` = VALUES(`reward_unit`),
+    `expire_days` = VALUES(`expire_days`),
+    `status` = VALUES(`status`);
+
+INSERT INTO `growth_activity`
+(`activity_code`, `activity_name`, `trigger_type`, `description`, `status`, `once_per_user`, `auto_grant`, `priority`)
+VALUES
+('real-name-verify-gift', '实名认证奖励', 'real_name_verify', '完成实名认证后可在通知中心手动领取奖励', 1, 1, 0, 50)
+ON DUPLICATE KEY UPDATE
+    `trigger_type` = VALUES(`trigger_type`),
+    `activity_name` = VALUES(`activity_name`),
+    `description` = VALUES(`description`),
+    `status` = VALUES(`status`),
+    `once_per_user` = VALUES(`once_per_user`),
+    `auto_grant` = VALUES(`auto_grant`),
+    `priority` = VALUES(`priority`);
+
+INSERT INTO `growth_activity_reward`
+(`activity_id`, `reward_type`, `reward_value`, `reward_unit`, `expire_days`, `status`, `sort_order`)
+SELECT `id`, 'quota', 5, 'quota', 0, 1, 10
+FROM `growth_activity`
+WHERE `activity_code` = 'real-name-verify-gift'
 ON DUPLICATE KEY UPDATE
     `reward_value` = VALUES(`reward_value`),
     `reward_unit` = VALUES(`reward_unit`),

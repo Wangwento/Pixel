@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Input, Button, message, Dropdown, Avatar } from 'antd';
+import { Input, Button, message, Dropdown, Avatar, Spin, Empty } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   UserOutlined,
@@ -7,7 +7,14 @@ import {
   SettingOutlined,
   LogoutOutlined,
   CrownOutlined,
+  FireOutlined,
+  HeartOutlined,
+  StarOutlined,
+  MessageOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
+import { getHotImages } from '../../api/image';
+import type { HotImage } from '../../api/image';
 import { useNavigate } from 'react-router-dom';
 import LoginModal from '../../components/LoginModal';
 import RegisterModal from '../../components/RegisterModal';
@@ -34,6 +41,16 @@ const Home: React.FC = () => {
   const { currentUser, setCurrentUser, logout: authLogout } = useAuth();
   const videoRefs = [useRef<HTMLVideoElement>(null), useRef<HTMLVideoElement>(null)];
   const navigate = useNavigate();
+
+  // 热门图片
+  const [hotImages, setHotImages] = useState<HotImage[]>([]);
+  const [hotLoading, setHotLoading] = useState(false);
+  const [hotPage, setHotPage] = useState(0);
+  const [hotHasMore, setHotHasMore] = useState(true);
+  const hotSentinelRef = useRef<HTMLDivElement>(null);
+  const hotFetchingRef = useRef(false);
+  const [hotPreview, setHotPreview] = useState<HotImage | null>(null);
+  const hotSectionRef = useRef<HTMLDivElement>(null);
 
   // 用 ref 存储可变状态，避免 useCallback/useEffect 依赖问题
   const stateRef = useRef({
@@ -141,6 +158,52 @@ const Home: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // 加载热门图片
+  const fetchHotImages = async (pageNum: number) => {
+    if (hotFetchingRef.current) return;
+    hotFetchingRef.current = true;
+    setHotLoading(true);
+    try {
+      const raw = await getHotImages({ page: pageNum, pageSize: 20 });
+      const res = raw as any;
+      const list: HotImage[] = res?.data?.list ?? [];
+      if (pageNum === 1) {
+        setHotImages(list);
+      } else {
+        setHotImages(prev => [...prev, ...list]);
+      }
+      setHotHasMore(list.length >= 20);
+      setHotPage(pageNum);
+    } catch {
+      // 静默
+    } finally {
+      hotFetchingRef.current = false;
+      setHotLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHotImages(1);
+  }, []);
+
+  // 热门图片无限滚动
+  useEffect(() => {
+    const el = hotSentinelRef.current;
+    if (!el || !hotHasMore) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !hotFetchingRef.current && hotPage > 0) {
+        fetchHotImages(hotPage + 1);
+      }
+    }, { rootMargin: '300px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotPage, hotHasMore]);
+
+  const scrollToHot = () => {
+    hotSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const handleStart = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -204,6 +267,7 @@ const Home: React.FC = () => {
   ];
 
   return (
+    <div className="home-wrapper">
     <div className="home-fullscreen">
       {/* 左上角 Logo */}
       <div className="home-header">
@@ -294,11 +358,107 @@ const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* 底部提示 */}
-      <div className="scroll-hint">
-        <span>热门头像</span>
+      {/* 底部提示 - 点击滚动到热门 */}
+      <div className="scroll-hint" onClick={scrollToHot} style={{ cursor: 'pointer' }}>
+        <span>热门内容</span>
         <div className="scroll-arrow" />
       </div>
+      </div>
+
+      {/* ====== 第二屏：热门图片 ====== */}
+      <div className="home-hot-section" ref={hotSectionRef}>
+        <div className="home-hot-header">
+          <FireOutlined className="home-hot-icon" />
+          <h2>热门作品</h2>
+          <p>精选社区优秀 AI 生成作品</p>
+        </div>
+
+        {hotImages.length === 0 && hotLoading && (
+          <div className="home-hot-loading"><Spin size="large" /></div>
+        )}
+
+        {hotImages.length === 0 && !hotLoading && (
+          <div className="home-hot-empty">
+            <Empty description="暂无热门作品" />
+          </div>
+        )}
+
+        {hotImages.length > 0 && (
+          <div className="home-hot-masonry">
+            {hotImages.map((item) => {
+              const isVideo = item.mediaType === 'video';
+              return (
+                <div key={item.id} className="home-hot-card" onClick={() => setHotPreview(item)}>
+                  <div className="home-hot-card-media">
+                    {isVideo ? (
+                      <>
+                        <img
+                          src={item.coverUrl || item.imageUrl}
+                          alt={item.title || '热门作品'}
+                          loading="lazy" decoding="async"
+                        />
+                        <div className="home-hot-card-play"><PlayCircleOutlined /></div>
+                      </>
+                    ) : (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title || '热门作品'}
+                        loading="lazy" decoding="async"
+                      />
+                    )}
+                  </div>
+                  <div className="home-hot-card-info">
+                    {item.title && <p className="home-hot-card-title">{item.title}</p>}
+                    <div className="home-hot-card-bottom">
+                      <div className="home-hot-card-meta">
+                        <UserOutlined />
+                        <span>{item.nickname || `用户 ${item.userId}`}</span>
+                      </div>
+                      <div className="home-hot-card-actions" onClick={(e) => e.stopPropagation()}>
+                        <span className="home-hot-action" title="点赞">
+                          <HeartOutlined />{item.likeCount || 0}
+                        </span>
+                        <span className="home-hot-action" title="收藏">
+                          <StarOutlined />{item.collectCount || 0}
+                        </span>
+                        <span className="home-hot-action" title="评论">
+                          <MessageOutlined />{item.commentCount || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {hotLoading && hotImages.length > 0 && (
+          <div className="home-hot-load-more"><Spin /><span>加载更多...</span></div>
+        )}
+
+        {!hotHasMore && hotImages.length > 0 && (
+          <div className="home-hot-end">已经到底啦</div>
+        )}
+
+        {hotHasMore && !hotLoading && <div ref={hotSentinelRef} style={{ height: 1 }} />}
+      </div>
+
+      {/* 热门大图预览 */}
+      {hotPreview && (
+        <div className="home-hot-preview-overlay" onClick={() => setHotPreview(null)}>
+          <div className="home-hot-preview-body" onClick={(e) => e.stopPropagation()}>
+            {hotPreview.mediaType === 'video' ? (
+              <video src={hotPreview.imageUrl} controls autoPlay className="home-hot-preview-video" />
+            ) : (
+              <img src={hotPreview.imageUrl} alt={hotPreview.title || '预览'} />
+            )}
+            {hotPreview.title && <h3>{hotPreview.title}</h3>}
+            {hotPreview.description && <p className="home-hot-preview-desc">{hotPreview.description}</p>}
+            <button className="home-hot-preview-close" onClick={() => setHotPreview(null)}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* 登录弹窗 */}
       <LoginModal

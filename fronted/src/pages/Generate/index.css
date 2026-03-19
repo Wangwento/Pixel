@@ -35,19 +35,177 @@
 
 .result-content {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   min-height: 400px;
 }
 
-.loading-container {
+.result-stage {
+  position: relative;
+  width: 100%;
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top, rgba(24, 144, 255, 0.14), transparent 52%),
+    linear-gradient(180deg, #f8fbff 0%, #f3f6fb 100%);
+  border: 1px solid rgba(24, 144, 255, 0.08);
+}
+
+.result-stage.has-image {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(240, 244, 255, 0.92) 100%),
+    #f4f7fb;
+}
+
+.result-stage.is-generating::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(24, 144, 255, 0.08));
+  pointer-events: none;
+}
+
+.generated-image-shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.generated-image {
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.generated-image.is-loading {
+  opacity: 0;
+  transform: translateY(18px) scale(0.985);
+  filter: blur(14px);
+  clip-path: inset(0 0 100% 0 round 20px);
+}
+
+.generated-image.is-loaded {
+  opacity: 1;
+  animation: imageRevealDown 950ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.result-stage.is-generating .generated-image.is-loaded {
+  filter: blur(2px) brightness(0.8) saturate(0.88);
+  transform: scale(1.01);
+  transition: filter 0.35s ease, transform 0.35s ease;
+}
+
+.result-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(249, 250, 255, 0.7) 0%, rgba(245, 248, 255, 0.92) 100%);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.result-overlay-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -35%;
+  height: 55%;
+  background: linear-gradient(180deg, rgba(24, 144, 255, 0.28), rgba(24, 144, 255, 0));
+  animation: beamSweepDown 2.4s ease-in-out infinite;
+}
+
+.result-overlay-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.result-overlay-badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(24, 144, 255, 0.1);
+  color: #1677ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.result-overlay-title {
+  font-size: 18px;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.result-overlay-description {
+  max-width: 280px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.result-skeleton {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.result-skeleton-frame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #eef3ff 0%, #e4ecfb 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.result-skeleton-frame::after,
+.result-skeleton-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateY(-100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
+  animation: beamSweepDown 2s ease-in-out infinite;
+}
+
+.result-skeleton-line {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #e7edf8;
+  overflow: hidden;
+}
+
+.result-skeleton-line-short {
+  width: 62%;
 }
 
 .placeholder {
+  position: relative;
+  z-index: 1;
   text-align: center;
   color: #999;
 }
@@ -58,13 +216,48 @@
 
 .generated-image {
   max-width: 100%;
-  max-height: 400px;
-  border-radius: 8px;
+}
+
+@keyframes imageRevealDown {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(14px);
+    clip-path: inset(0 0 100% 0 round 20px);
+  }
+  55% {
+    opacity: 1;
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    clip-path: inset(0 0 0 0 round 20px);
+  }
+}
+
+@keyframes beamSweepDown {
+  0% {
+    transform: translateY(-130%);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(230%);
+    opacity: 0;
+  }
 }
 
 @media (max-width: 992px) {
   .input-card,
   .result-card {
     margin-bottom: 24px;
+  }
+
+  .result-stage {
+    min-height: 360px;
   }
 }

@@ -8,7 +8,11 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import DashboardGenerate from '../pages/Dashboard/Generate';
 import Assets from '../pages/Assets';
+import Hot from '../pages/Hot';
 import Vip from '../pages/Dashboard/Vip';
+import DashboardVideo from '../pages/Dashboard/Video';
+import DashboardAudio from '../pages/Dashboard/Audio';
+import DashboardCanvas from '../pages/Dashboard/CanvasWorkspace';
 
 // 路由守卫组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -67,6 +71,22 @@ const router = createBrowserRouter([
         path: 'assets',
         element: <Assets />,
       },
+      {
+        path: 'hot',
+        element: <Hot />,
+      },
+      {
+        path: 'video',
+        element: <DashboardVideo />,
+      },
+      {
+        path: 'canvas',
+        element: <DashboardCanvas />,
+      },
+      {
+        path: 'audio',
+        element: <DashboardAudio />,
+      },
     ],
   },
   {
@@ -74,6 +94,22 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Vip />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/canvas',
+    element: (
+      <ProtectedRoute>
+        <Navigate to="/dashboard/canvas" replace />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/canvas/:workflowId',
+    element: (
+      <ProtectedRoute>
+        <DashboardCanvas />
       </ProtectedRoute>
     ),
   },

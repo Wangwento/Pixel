@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { getCurrentUser } from '../api/auth';
+import { getCurrentUser, logout as userLogout } from '../api/auth';
 import type { UserInfo } from '../api/auth';
 
 interface AuthContextType {
@@ -68,6 +68,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const logout = useCallback(() => {
+    if (localStorage.getItem('token')) {
+      userLogout().catch(() => undefined);
+    }
     localStorage.removeItem('token');
     setCurrentUser(null);
   }, []);

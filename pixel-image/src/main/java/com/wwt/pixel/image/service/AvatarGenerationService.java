@@ -32,7 +32,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -59,7 +62,7 @@ public class AvatarGenerationService {
             .build();
 
     private static final String LOCK_PREFIX = "generation:lock:user:";
-    private static final Duration LOCK_EXPIRE_TIME = Duration.ofMinutes(5);
+    private static final Duration LOCK_EXPIRE_TIME = Duration.ofMinutes(10);
 
     /**
      * 文生图（带幂等处理 + 消息队列异步处理）
@@ -67,9 +70,11 @@ public class AvatarGenerationService {
      * 数据一致性通过 Redis分布式锁 + 本地消息表 保证。
      */
     public GenerationResult generateAvatar(Long userId, String prompt, String style, String modelId,
-                                           String aspectRatio, String imageSize) {
+                                           String aspectRatio, String imageSize,
+                                           Map<String, Object> extraParams) {
         return executeGenerationWithLock(userId,
-                taskId -> doGenerateAvatarAsync(userId, prompt, style, modelId, aspectRatio, imageSize, taskId));
+                taskId -> doGenerateAvatarAsync(
+                        userId, prompt, style, modelId, aspectRatio, imageSize, extraParams, taskId));
     }
 
     /**
@@ -77,11 +82,12 @@ public class AvatarGenerationService {
      */
     public GenerationResult generateAvatarFromImages(Long userId, String prompt, String style, String modelId,
                                                      List<MultipartFile> sourceImages, List<String> sourceImageUrls,
-                                                     String responseFormat, String aspectRatio, String imageSize) {
+                                                     String responseFormat, String aspectRatio, String imageSize,
+                                                     Map<String, Object> extraParams) {
         return executeGenerationWithLock(userId,
                 taskId -> doGenerateAvatarFromImagesAsync(
                         userId, prompt, style, modelId, sourceImages, sourceImageUrls,
-                        responseFormat, aspectRatio, imageSize, taskId));
+                        responseFormat, aspectRatio, imageSize, extraParams, taskId));
     }
 
     private GenerationResult executeGenerationWithLock(Long userId, TaskExecutor taskExecutor) {
@@ -162,25 +168,41 @@ public class AvatarGenerationService {
      * 实际的生成逻辑（异步处理，通过MQ解耦）
      */
     private GenerationResult doGenerateAvatarAsync(Long userId, String prompt, String style, String modelId,
-                                                   String aspectRatio, String imageSize, String taskId) {
+                                                   String aspectRatio, String imageSize,
+                                                   Map<String, Object> extraParams, String taskId) {
         checkQuotaAndModelAccess(userId, modelId, false);
 
-        // 2. 构建缓存key
-        String cacheKey = buildTextCacheKey(prompt, style, modelId, aspectRatio, imageSize);
+        StyleTemplate template = getStyleTemplate(style);
+        GenerationRequest request = buildRequest(prompt, style, template, modelId, aspectRatio, imageSize, extraParams);
+
+        // 2. 构建缓存key（基于最终生效的请求内容）
+        String cacheKey = buildTextCacheKey(request);
 
         // 3. 查询缓存
         GenerationResult cached = getCachedResult(cacheKey);
         if (cached != null) {
             log.info("命中本地缓存, key: {}, userId: {}", cacheKey, userId);
 
-            // 缓存命中，发送成功消息到MQ（异步扣减额度）
-            sendSuccessMessage(userId, null, taskId, cached);
+            GenerationRecord cachedRecord = GenerationRecord.builder()
+                    .userId(userId)
+                    .prompt(prompt)
+                    .negativePrompt(request.getNegativePrompt())
+                    .style(style)
+                    .status(0)
+                    .build();
+            generationRecordMapper.insert(cachedRecord);
+
+            // 缓存命中，仍写入生成记录并发送成功消息到MQ（异步扣减额度、同步资产）
+            sendSuccessMessage(userId, cachedRecord.getId(), taskId, cached);
 
             return GenerationResult.builder()
                     .taskId(taskId)
                     .imageUrl(cached.getImageUrl())
                     .imageBase64(cached.getImageBase64())
+                    .imageUrls(cached.getImageUrls())
+                    .imageBase64List(cached.getImageBase64List())
                     .ossUrl(cached.getOssUrl())
+                    .ossUrls(cached.getOssUrls())
                     .revisedPrompt(cached.getRevisedPrompt())
                     .vendor(cached.getVendor())
                     .model(cached.getModel())
@@ -193,20 +215,14 @@ public class AvatarGenerationService {
         GenerationRecord record = GenerationRecord.builder()
                 .userId(userId)
                 .prompt(prompt)
+                .negativePrompt(request.getNegativePrompt())
                 .style(style)
                 .status(0)  // 生成中
                 .build();
         generationRecordMapper.insert(record);
         log.info("插入生成记录, recordId: {}, userId: {}", record.getId(), userId);
 
-        // 5. 获取风格模板并构建请求
-        StyleTemplate template = null;
-        if (style != null && !style.isBlank()) {
-            template = styleTemplateService.getTemplateByNameEn(style);
-        }
-
-        GenerationRequest request = buildRequest(prompt, style, template, modelId, aspectRatio, imageSize);
-        log.info("文生图请求, prompt: {}", request.getPrompt());
+        log.info("文生图请求, prompt: {}, negativePrompt: {}", request.getPrompt(), request.getNegativePrompt());
 
         // 6. 调用AI生成
         GenerationResult result;
@@ -240,7 +256,9 @@ public class AvatarGenerationService {
                 .recordId(recordId)
                 .taskId(taskId)
                 .imageUrl(result.getImageUrl())
+                .imageUrls(result.getImageUrls())
                 .ossUrl(result.getOssUrl())
+                .ossUrls(result.getOssUrls())
                 .vendor(result.getVendor())
                 .model(result.getModel())
                 .generationTimeMs(result.getGenerationTimeMs())
@@ -270,23 +288,38 @@ public class AvatarGenerationService {
     private GenerationResult doGenerateAvatarFromImagesAsync(Long userId, String prompt, String style, String modelId,
                                                              List<MultipartFile> sourceImages, List<String> sourceImageUrls,
                                                              String responseFormat, String aspectRatio,
-                                                             String imageSize, String taskId) {
+                                                             String imageSize, Map<String, Object> extraParams,
+                                                             String taskId) {
         checkQuotaAndModelAccess(userId, modelId, true);
 
         List<String> imageBase64List = toBase64List(sourceImages);
         List<String> imageDigests = toImageDigests(sourceImages, sourceImageUrls);
-        String cacheKey = buildImageToImageCacheKey(
-                prompt, style, modelId, responseFormat, aspectRatio, imageSize, imageDigests);
+        StyleTemplate template = getStyleTemplate(style);
+        GenerationRequest request = buildImageToImageRequest(
+                prompt, style, template, modelId, imageBase64List, sourceImageUrls,
+                responseFormat, aspectRatio, imageSize, extraParams);
+        String cacheKey = buildImageToImageCacheKey(request, imageDigests);
 
         GenerationResult cached = getCachedResult(cacheKey);
         if (cached != null) {
             log.info("命中图生图本地缓存, key: {}, userId: {}", cacheKey, userId);
-            sendSuccessMessage(userId, null, taskId, cached);
+            GenerationRecord cachedRecord = GenerationRecord.builder()
+                    .userId(userId)
+                    .prompt(prompt)
+                    .negativePrompt(request.getNegativePrompt())
+                    .style(style)
+                    .status(0)
+                    .build();
+            generationRecordMapper.insert(cachedRecord);
+            sendSuccessMessage(userId, cachedRecord.getId(), taskId, cached);
             return GenerationResult.builder()
                     .taskId(taskId)
                     .imageUrl(cached.getImageUrl())
                     .imageBase64(cached.getImageBase64())
+                    .imageUrls(cached.getImageUrls())
+                    .imageBase64List(cached.getImageBase64List())
                     .ossUrl(cached.getOssUrl())
+                    .ossUrls(cached.getOssUrls())
                     .revisedPrompt(cached.getRevisedPrompt())
                     .vendor(cached.getVendor())
                     .model(cached.getModel())
@@ -298,21 +331,15 @@ public class AvatarGenerationService {
         GenerationRecord record = GenerationRecord.builder()
                 .userId(userId)
                 .prompt(prompt)
+                .negativePrompt(request.getNegativePrompt())
                 .style(style)
                 .status(0)
                 .build();
         generationRecordMapper.insert(record);
         log.info("插入图生图记录, recordId: {}, userId: {}", record.getId(), userId);
 
-        StyleTemplate template = null;
-        if (style != null && !style.isBlank()) {
-            template = styleTemplateService.getTemplateByNameEn(style);
-        }
-
-        GenerationRequest request = buildImageToImageRequest(
-                prompt, style, template, modelId, imageBase64List, sourceImageUrls,
-                responseFormat, aspectRatio, imageSize);
-        log.info("图生图请求, prompt: {}, imageCount: {}", request.getPrompt(),
+        log.info("图生图请求, prompt: {}, negativePrompt: {}, imageCount: {}", request.getPrompt(),
+                request.getNegativePrompt(),
                 imageBase64List.size() + (sourceImageUrls == null ? 0 : sourceImageUrls.size()));
 
         try {
@@ -360,35 +387,38 @@ public class AvatarGenerationService {
         if (selectedModel == null || !selectedModel.isAvailable()) {
             throw new BusinessException("您的VIP等级不足以使用该模型，请升级会员");
         }
-        if (requireImageToImageSupport && !selectedModel.isImageToImageSupported()) {
+        if (requireImageToImageSupport && !selectedModel.isSupportsImageInput()) {
             throw new BusinessException("当前模型暂不支持图生图，请切换支持图生图的模型");
         }
     }
 
-    private String buildTextCacheKey(String prompt, String style, String modelId,
-                                     String aspectRatio, String imageSize) {
-        String content = prompt
-                + "|" + (style != null ? style : "")
-                + "|" + (modelId != null ? modelId : "")
-                + "|" + (aspectRatio != null ? aspectRatio : "1:1")
-                + "|" + (imageSize != null ? imageSize : "1K");
+    private String buildTextCacheKey(GenerationRequest request) {
+        String content = request.getPrompt()
+                + "|" + (request.getNegativePrompt() != null ? request.getNegativePrompt() : "")
+                + "|" + (request.getStyle() != null ? request.getStyle() : "")
+                + "|" + (request.getModelId() != null ? request.getModelId() : "")
+                + "|" + (request.getAspectRatio() != null ? request.getAspectRatio() : "1:1")
+                + "|" + (request.getImageSize() != null ? request.getImageSize() : "1K")
+                + "|" + stringifyExtraParams(request.getExtraParams());
         return "avatar:" + DigestUtils.md5DigestAsHex(content.getBytes(StandardCharsets.UTF_8));
     }
 
-    private String buildImageToImageCacheKey(String prompt, String style, String modelId, String responseFormat,
-                                             String aspectRatio, String imageSize, List<String> imageDigests) {
-        String content = prompt
-                + "|" + (style != null ? style : "")
-                + "|" + (modelId != null ? modelId : "")
-                + "|" + (responseFormat != null ? responseFormat : "url")
-                + "|" + (aspectRatio != null ? aspectRatio : "")
-                + "|" + (imageSize != null ? imageSize : "")
+    private String buildImageToImageCacheKey(GenerationRequest request, List<String> imageDigests) {
+        String content = request.getPrompt()
+                + "|" + (request.getNegativePrompt() != null ? request.getNegativePrompt() : "")
+                + "|" + (request.getStyle() != null ? request.getStyle() : "")
+                + "|" + (request.getModelId() != null ? request.getModelId() : "")
+                + "|" + (request.getResponseFormat() != null ? request.getResponseFormat() : "url")
+                + "|" + (request.getAspectRatio() != null ? request.getAspectRatio() : "")
+                + "|" + (request.getImageSize() != null ? request.getImageSize() : "")
+                + "|" + stringifyExtraParams(request.getExtraParams())
                 + "|" + String.join(",", imageDigests);
         return "avatar:edit:" + DigestUtils.md5DigestAsHex(content.getBytes(StandardCharsets.UTF_8));
     }
 
     private GenerationRequest buildRequest(String prompt, String style, StyleTemplate template, String modelId,
-                                           String aspectRatio, String imageSize) {
+                                           String aspectRatio, String imageSize,
+                                           Map<String, Object> extraParams) {
         GenerationRequest request = new GenerationRequest();
 
         if (template != null && template.getPromptTemplate() != null
@@ -398,12 +428,15 @@ public class AvatarGenerationService {
             request.setPrompt(fullPrompt);
         } else if (template != null) {
             // 模板没有占位符，使用默认拼接
-            request.setPrompt(prompt + ", portrait, avatar, high quality, detailed");
+            request.setPrompt(prompt + ", high quality, detailed");
         } else {
             // 无模板，添加基础质量描述
-            request.setPrompt(prompt + ", portrait, avatar, high quality, detailed");
+            request.setPrompt(prompt + ", high quality, detailed");
         }
 
+        if (template != null && StringUtils.hasText(template.getNegativePrompt())) {
+            request.setNegativePrompt(template.getNegativePrompt());
+        }
         request.setStyle(style);
         request.setSize("1024x1024");
         request.setQuality("hd");
@@ -416,14 +449,25 @@ public class AvatarGenerationService {
         if (StringUtils.hasText(imageSize)) {
             request.setImageSize(imageSize);
         }
+        if (extraParams != null && !extraParams.isEmpty()) {
+            request.setExtraParams(new LinkedHashMap<>(extraParams));
+        }
         return request;
+    }
+
+    private StyleTemplate getStyleTemplate(String style) {
+        if (!StringUtils.hasText(style)) {
+            return null;
+        }
+        return styleTemplateService.getTemplateByNameEn(style);
     }
 
     private GenerationRequest buildImageToImageRequest(String prompt, String style, StyleTemplate template,
                                                        String modelId, List<String> sourceImageBase64List,
                                                        List<String> sourceImageUrls,
-                                                       String responseFormat, String aspectRatio, String imageSize) {
-        GenerationRequest request = buildRequest(prompt, style, template, modelId, null, null);
+                                                       String responseFormat, String aspectRatio, String imageSize,
+                                                       Map<String, Object> extraParams) {
+        GenerationRequest request = buildRequest(prompt, style, template, modelId, null, null, extraParams);
         request.setSourceImageBase64List(sourceImageBase64List);
         request.setSourceImageUrls(sourceImageUrls);
         if (!sourceImageBase64List.isEmpty()) {
@@ -442,6 +486,13 @@ public class AvatarGenerationService {
             request.setImageSize(imageSize);
         }
         return request;
+    }
+
+    private String stringifyExtraParams(Map<String, Object> extraParams) {
+        if (extraParams == null || extraParams.isEmpty()) {
+            return "{}";
+        }
+        return new TreeMap<>(extraParams).toString();
     }
 
     private List<String> toBase64List(List<MultipartFile> sourceImages) {

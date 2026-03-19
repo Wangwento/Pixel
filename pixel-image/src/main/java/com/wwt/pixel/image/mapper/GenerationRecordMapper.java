@@ -11,8 +11,8 @@ import java.util.List;
 @Mapper
 public interface GenerationRecordMapper {
 
-    @Insert("INSERT INTO generation_record (user_id, prompt, style, status, created_at) " +
-            "VALUES (#{userId}, #{prompt}, #{style}, #{status}, NOW())")
+    @Insert("INSERT INTO generation_record (user_id, prompt, negative_prompt, style, status, created_at) " +
+            "VALUES (#{userId}, #{prompt}, #{negativePrompt}, #{style}, #{status}, NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(GenerationRecord record);
 

@@ -86,6 +86,39 @@
   gap: 8px;
 }
 
+.dashboard-sider.ant-layout-sider-collapsed .sider-logo {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.dashboard-sider.ant-layout-sider-collapsed .logo-left,
+.dashboard-sider.ant-layout-sider-collapsed .logo-actions {
+  width: 100%;
+  justify-content: center;
+}
+
+.dashboard-sider.ant-layout-sider-collapsed .logo-actions {
+  gap: 0;
+}
+
+.notification-badge {
+  display: inline-flex;
+}
+
+.dashboard-sider.ant-layout-sider-collapsed .notification-badge {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.dashboard-sider.ant-layout-sider-collapsed .notification-badge .ant-badge-count,
+.dashboard-sider.ant-layout-sider-collapsed .notification-badge .ant-badge-dot {
+  box-shadow: 0 0 0 2px #161b22;
+}
+
 .notification-trigger {
   width: 32px;
   height: 32px;
@@ -284,6 +317,38 @@
   line-height: 1.6;
 }
 
+.notification-view-switch {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.notification-view-btn {
+  appearance: none;
+  border: 1px solid rgba(99, 179, 237, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-view-btn:hover {
+  color: #fff;
+  border-color: rgba(99, 179, 237, 0.28);
+  background: rgba(99, 179, 237, 0.12);
+}
+
+.notification-view-btn.active {
+  color: #0d1117;
+  background: linear-gradient(135deg, #63b3ed 0%, #81e6d9 100%);
+  border-color: transparent;
+  box-shadow: 0 10px 20px rgba(99, 179, 237, 0.24);
+}
+
 .notification-task-list {
   display: flex;
   flex-direction: column;
@@ -370,6 +435,46 @@
   color: rgba(255, 255, 255, 0.45);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.notification-task-action.ant-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.notification-task-action.claimable.ant-btn {
+  border: none;
+  background: linear-gradient(135deg, #63b3ed 0%, #4fd1c5 100%);
+  color: #0b1020;
+}
+
+.notification-task-action.claimable.ant-btn:hover,
+.notification-task-action.claimable.ant-btn:focus {
+  background: linear-gradient(135deg, #7cc4f3 0%, #66ddd2 100%);
+  color: #0b1020;
+}
+
+.notification-task-action.action_required.ant-btn {
+  border-color: rgba(236, 201, 75, 0.38);
+  background: rgba(236, 201, 75, 0.08);
+  color: #f6e05e;
+}
+
+.notification-task-action.action_required.ant-btn:hover,
+.notification-task-action.action_required.ant-btn:focus {
+  border-color: rgba(236, 201, 75, 0.55);
+  background: rgba(236, 201, 75, 0.14);
+  color: #fff4a3;
+}
+
+.notification-task-action.claimed.ant-btn,
+.notification-task-action.claimed.ant-btn:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.42);
 }
 
 .notification-empty,
@@ -836,6 +941,11 @@
   color: #2b6cb0;
 }
 
+.theme-light .dashboard-sider.ant-layout-sider-collapsed .notification-badge .ant-badge-count,
+.theme-light .dashboard-sider.ant-layout-sider-collapsed .notification-badge .ant-badge-dot {
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
 .theme-light .collapse-toggle {
   background: linear-gradient(180deg, #fff 0%, #f8f9fb 100%);
   border-color: #e8ecf1;
@@ -1062,6 +1172,24 @@ body[data-theme="light"] .notification-summary-tip {
   color: rgba(0, 0, 0, 0.42);
 }
 
+body[data-theme="light"] .notification-view-btn {
+  background: #ffffff;
+  color: #4a5568;
+  border-color: #d8e0ea;
+}
+
+body[data-theme="light"] .notification-view-btn:hover {
+  color: #1a202c;
+  border-color: #9fc0e0;
+  background: #edf5ff;
+}
+
+body[data-theme="light"] .notification-view-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #2b6cb0 0%, #319795 100%);
+  box-shadow: 0 10px 18px rgba(49, 151, 149, 0.18);
+}
+
 body[data-theme="light"] .notification-task-card {
   background: #fff;
   border-color: #e8ecf1;
@@ -1091,6 +1219,42 @@ body[data-theme="light"] .notification-task-reward {
 
 body[data-theme="light"] .notification-task-tip {
   color: rgba(0, 0, 0, 0.42);
+}
+
+body[data-theme="light"] .notification-task-action.ant-btn {
+  box-shadow: none;
+}
+
+body[data-theme="light"] .notification-task-action.claimable.ant-btn {
+  background: linear-gradient(135deg, #4c51bf 0%, #6b46c1 100%) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+body[data-theme="light"] .notification-task-action.claimable.ant-btn:hover,
+body[data-theme="light"] .notification-task-action.claimable.ant-btn:focus {
+  background: linear-gradient(135deg, #5a60d1 0%, #7a54d4 100%) !important;
+  color: #fff !important;
+}
+
+body[data-theme="light"] .notification-task-action.action_required.ant-btn {
+  border-color: rgba(76, 81, 191, 0.24) !important;
+  background: rgba(76, 81, 191, 0.08) !important;
+  color: #4c51bf !important;
+}
+
+body[data-theme="light"] .notification-task-action.action_required.ant-btn:hover,
+body[data-theme="light"] .notification-task-action.action_required.ant-btn:focus {
+  border-color: rgba(76, 81, 191, 0.38) !important;
+  background: rgba(76, 81, 191, 0.14) !important;
+  color: #3c45a5 !important;
+}
+
+body[data-theme="light"] .notification-task-action.claimed.ant-btn,
+body[data-theme="light"] .notification-task-action.claimed.ant-btn:disabled {
+  border-color: #d9dce6 !important;
+  background: #f7f8fa !important;
+  color: rgba(0, 0, 0, 0.38) !important;
 }
 
 body[data-theme="light"] .profile-reward-modal .ant-modal-content {

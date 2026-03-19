@@ -32,6 +32,22 @@
   padding: 16px 0;
 }
 
+.auth-code-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.auth-code-item {
+  flex: 1;
+}
+
+.auth-send-code-btn {
+  height: 40px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
 @media (max-width: 480px) {
   .login-card {
     width: 90%;

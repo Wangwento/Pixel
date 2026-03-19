@@ -20,6 +20,7 @@ public class User {
     private String nickname;
     private String avatar;
     private String email;
+    private Integer emailVerified;
     private String phone;
 
     // 认证状态
@@ -86,14 +87,24 @@ public class User {
      * 检查手机是否已认证
      */
     public boolean hasPhoneVerified() {
-        return phoneVerified != null && phoneVerified == 1;
+        return phoneVerified != null && phoneVerified == 1 && phone != null && !phone.isBlank();
+    }
+
+    /**
+     * 检查邮箱是否已认证
+     */
+    public boolean hasEmailVerified() {
+        return emailVerified != null && emailVerified == 1 && email != null && !email.isBlank();
     }
 
     /**
      * 检查实名是否已认证
      */
     public boolean hasRealNameVerified() {
-        return realNameVerified != null && realNameVerified == VerifyStatus.VERIFIED;
+        return realNameVerified != null
+                && realNameVerified == VerifyStatus.VERIFIED
+                && realName != null
+                && !realName.isBlank();
     }
 
     /**

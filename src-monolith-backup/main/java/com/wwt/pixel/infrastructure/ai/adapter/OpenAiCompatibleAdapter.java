@@ -145,7 +145,7 @@ public class OpenAiCompatibleAdapter implements ImageModelAdapter {
             sb.append(request.getStyle()).append(" style, ");
         }
         sb.append(request.getPrompt());
-        sb.append(", portrait, avatar, high quality, detailed");
+        sb.append(", high quality, detailed");
         if (StringUtils.hasText(request.getNegativePrompt())) {
             sb.append(", avoid: ").append(request.getNegativePrompt());
         }

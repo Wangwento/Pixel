@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Input, Button, Form, Checkbox, message, Progress } from 'antd';
 import {
   UserOutlined,
@@ -9,7 +9,7 @@ import {
   GiftOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { register } from '../../api/auth';
+import { checkEmailAvailable, checkUsernameAvailable, register, sendEmailVerifyCode } from '../../api/auth';
 import type { UserInfo } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import './index.css';
@@ -28,9 +28,21 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
   onBackToLogin,
 }) => {
   const [loading, setLoading] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [form] = Form.useForm();
   const { setCurrentUser } = useAuth();
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [countdown]);
 
   // 计算密码强度
   const calculatePasswordStrength = (password: string) => {
@@ -60,7 +72,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
     username: string;
     password: string;
     confirmPassword: string;
-    email?: string;
+    email: string;
+    emailCode: string;
     agreement: boolean;
   }) => {
     if (!values.agreement) {
@@ -79,6 +92,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
         username: values.username,
         password: values.password,
         email: values.email,
+        emailCode: values.emailCode,
       }) as unknown as { code: number; data: { token: string; user: UserInfo }; message?: string };
 
       if (res.code === 200) {
@@ -96,6 +110,60 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSendEmailCode = async () => {
+    try {
+      const email = (form.getFieldValue('email') as string)?.trim();
+      if (!email) {
+        message.error('请输入邮箱');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        message.error('请输入有效的邮箱地址');
+        return;
+      }
+      setSendingCode(true);
+      await sendEmailVerifyCode(email, 'register');
+      message.success('验证码已发送，请查收邮箱');
+      setCountdown(60);
+    } catch (error: unknown) {
+      const formError = error as { errorFields?: Array<unknown>; response?: { data?: { message?: string } } };
+      if (formError.errorFields) {
+        return;
+      }
+      message.error(formError.response?.data?.message || '发送失败，请稍后重试');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const validateEmailAvailable = async (_: unknown, value?: string) => {
+    if (!value) {
+      return Promise.resolve();
+    }
+    const response = await checkEmailAvailable(value);
+    if (response.code !== 200) {
+      return Promise.reject(new Error(response.message || '邮箱校验失败，请稍后重试'));
+    }
+    if (!response.data?.available) {
+      return Promise.reject(new Error('邮箱已被注册'));
+    }
+    return Promise.resolve();
+  };
+
+  const validateUsernameAvailable = async (_: unknown, value?: string) => {
+    if (!value) {
+      return Promise.resolve();
+    }
+    const response = await checkUsernameAvailable(value);
+    if (response.code !== 200) {
+      return Promise.reject(new Error(response.message || '用户名校验失败，请稍后重试'));
+    }
+    if (!response.data?.available) {
+      return Promise.reject(new Error('用户名已存在'));
+    }
+    return Promise.resolve();
   };
 
   return (
@@ -212,10 +280,12 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
           <Form form={form} onFinish={handleSubmit} size="large" className="register-form" autoComplete="off">
             <Form.Item
               name="username"
+              validateTrigger="onBlur"
               rules={[
                 { required: true, message: '请输入用户名' },
                 { min: 3, max: 20, message: '用户名长度 3-20 个字符' },
                 { pattern: /^[a-zA-Z0-9_]+$/, message: '只能包含字母、数字和下划线' },
+                { validator: validateUsernameAvailable },
               ]}
             >
               <Input
@@ -228,17 +298,49 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
 
             <Form.Item
               name="email"
+              validateTrigger="onBlur"
               rules={[
+                { required: true, message: '请输入邮箱' },
                 { type: 'email', message: '请输入有效的邮箱地址' },
+                { validator: validateEmailAvailable },
               ]}
             >
               <Input
                 prefix={<MailOutlined className="input-icon" />}
-                placeholder="邮箱（选填，用于找回密码）"
+                placeholder="邮箱（注册必填，用于找回密码）"
                 className="register-input"
                 autoComplete="off"
               />
             </Form.Item>
+
+            <div className="register-code-row">
+              <Form.Item
+                name="emailCode"
+                rules={[
+                  { required: true, message: '请输入邮箱验证码' },
+                  { pattern: /^\d{6}$/, message: '请输入6位邮箱验证码' },
+                ]}
+                className="register-code-item"
+              >
+                <Input
+                  prefix={<SafetyCertificateOutlined className="input-icon" />}
+                  placeholder="邮箱验证码"
+                  className="register-input register-code-input"
+                  maxLength={6}
+                  autoComplete="off"
+                />
+              </Form.Item>
+              <Button
+                type="default"
+                htmlType="button"
+                className="register-send-code-btn"
+                disabled={countdown > 0}
+                loading={sendingCode}
+                onClick={handleSendEmailCode}
+              >
+                {countdown > 0 ? `${countdown}s 后重发` : '发送验证码'}
+              </Button>
+            </div>
 
             <Form.Item
               name="password"

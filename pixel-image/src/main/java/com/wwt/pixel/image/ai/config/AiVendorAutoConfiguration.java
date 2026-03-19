@@ -2,8 +2,6 @@ package com.wwt.pixel.image.ai.config;
 
 import com.wwt.pixel.image.ai.ImageModelAdapter;
 import com.wwt.pixel.image.ai.adapter.GeminiChatImageAdapter;
-import com.wwt.pixel.image.ai.adapter.OpenAiCompatibleAdapter;
-import com.wwt.pixel.image.ai.adapter.PlatoImageAdapter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -45,58 +43,13 @@ public class AiVendorAutoConfiguration {
                     continue;
                 }
 
-                String modelName = vendor.getModel() != null ? vendor.getModel() : "dall-e-3";
-                ImageModelAdapter adapter;
+                ImageModelAdapter adapter = CompatibleImageAdapterFactory.createAdapter(vendor);
 
-                boolean supportsImageInput = vendor.isSupportsImageInput()
-                        || modelName.toLowerCase().contains("nano-banana")
-                        || "plato".equalsIgnoreCase(vendor.getCode());
-
-                // Gemini 模型使用 Chat API 生成图片
-                if (modelName.toLowerCase().contains("gemini")) {
-                    adapter = new GeminiChatImageAdapter(
-                            vendor.getCode(),
-                            vendor.getName() != null ? vendor.getName() : vendor.getCode(),
-                            vendor.getApiKey(),
-                            vendor.getBaseUrl(),
-                            modelName,
-                            vendor.getWeight(),
-                            vendor.getTimeout(),
-                            vendor.getModelId(),
-                            vendor.getModelDisplayName(),
-                            vendor.getMinVipLevel()
-                    );
+                if (adapter instanceof GeminiChatImageAdapter) {
                     log.info("注册Gemini Chat适配器: {} ({})", vendor.getName(), vendor.getCode());
-                } else if (supportsImageInput) {
-                    // 支持图生图的兼容厂商使用 /v1/images/edits + multipart/form-data
-                    adapter = new PlatoImageAdapter(
-                            vendor.getCode(),
-                            vendor.getName() != null ? vendor.getName() : vendor.getCode(),
-                            vendor.getApiKey(),
-                            vendor.getBaseUrl(),
-                            modelName,
-                            vendor.getWeight(),
-                            vendor.getTimeout(),
-                            vendor.getModelId(),
-                            vendor.getModelDisplayName(),
-                            vendor.getMinVipLevel(),
-                            vendor.getAspectRatio(),
-                            vendor.getImageSize()
-                    );
+                } else if (adapter.supportsImageInput()) {
                     log.info("注册支持图生图的兼容适配器: {} ({})", vendor.getName(), vendor.getCode());
                 } else {
-                    adapter = new OpenAiCompatibleAdapter(
-                            vendor.getCode(),
-                            vendor.getName() != null ? vendor.getName() : vendor.getCode(),
-                            vendor.getApiKey(),
-                            vendor.getBaseUrl(),
-                            modelName,
-                            vendor.getWeight(),
-                            vendor.getTimeout(),
-                            vendor.getModelId(),
-                            vendor.getModelDisplayName(),
-                            vendor.getMinVipLevel()
-                    );
                     log.info("注册OpenAI兼容厂商: {} ({})", vendor.getName(), vendor.getCode());
                 }
 

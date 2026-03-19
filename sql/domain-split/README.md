@@ -7,6 +7,13 @@
 1. `01-pixel-user.sql`
 2. `02-pixel-image.sql`
 3. `03-pixel-trade.sql`
+4. `05-pixel-image-asset-upgrade.sql`
+5. `06-pixel-style-template-negative-prompt-upgrade.sql`
+6. `07-pixel-admin-rbac.sql`（如需管理后台账号/角色权限）
+7. `08-pixel-hot-image.sql`
+8. `09-pixel-vedio.sql`
+9. `10-pixel-hot-image-video-upgrade.sql`
+10. `14-pixel-image-asset-multi-image-upgrade.sql`
 
 ## 使用原则
 

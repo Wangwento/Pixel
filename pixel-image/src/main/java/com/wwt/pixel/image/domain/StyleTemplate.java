@@ -21,6 +21,8 @@ public class StyleTemplate {
 
     private String promptTemplate;
 
+    private String negativePrompt;
+
     private String coverImage;
 
     private String category;

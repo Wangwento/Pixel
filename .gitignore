@@ -43,5 +43,6 @@ application-prod.yml
 
 
 docs/*
-
+admin-fronted/*
+fronted/*
 

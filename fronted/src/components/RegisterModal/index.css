@@ -390,6 +390,45 @@
   font-size: 16px !important;
 }
 
+.register-code-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.register-code-item {
+  flex: 1;
+}
+
+.register-code-item .ant-form-item {
+  margin-bottom: 0;
+}
+
+.register-send-code-btn {
+  height: 48px !important;
+  margin-top: 0;
+  padding: 0 18px !important;
+  border-radius: 10px !important;
+  background: rgba(129, 230, 217, 0.12) !important;
+  border: 1px solid rgba(129, 230, 217, 0.32) !important;
+  color: #81e6d9 !important;
+  white-space: nowrap;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+.register-send-code-btn:hover:not(:disabled) {
+  background: rgba(129, 230, 217, 0.2) !important;
+  border-color: rgba(129, 230, 217, 0.56) !important;
+  color: #b8fff5 !important;
+}
+
+.register-send-code-btn:disabled {
+  color: rgba(129, 230, 217, 0.45) !important;
+  border-color: rgba(129, 230, 217, 0.18) !important;
+  background: rgba(129, 230, 217, 0.08) !important;
+}
+
 /* 密码强度 */
 .password-strength {
   display: flex;

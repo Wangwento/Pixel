@@ -14,6 +14,12 @@ public class CommonConstant {
     public static final String TOKEN_PREFIX = "Bearer ";
 
     /**
+     * HTTP Header 中传递的管理员信息
+     */
+    public static final String HEADER_ADMIN_ID = "X-Admin-Id";
+    public static final String HEADER_ADMIN_NAME = "X-Admin-Name";
+
+    /**
      * 积分规则 (核心锚点: 1张图=100积分=0.2元成本)
      */
     public static final int POINTS_PER_IMAGE = 100;         // 生成1张图需要的积分

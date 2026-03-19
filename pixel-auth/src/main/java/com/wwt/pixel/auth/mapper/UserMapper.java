@@ -20,16 +20,19 @@ public interface UserMapper {
     @Select("SELECT * FROM user WHERE email = #{email}")
     User findByEmail(String email);
 
+    @Select("SELECT * FROM user WHERE phone = #{phone}")
+    User findByPhone(String phone);
+
     @Select("SELECT * FROM user WHERE invite_code = #{inviteCode}")
     User findByInviteCode(String inviteCode);
 
     @Insert("""
-        INSERT INTO user (username, password, nickname, avatar, email, phone_verified,
+        INSERT INTO user (username, password, nickname, avatar, email, email_verified, phone_verified,
             real_name_verified, points, total_points, free_quota, free_quota_total,
             daily_limit, daily_used, daily_limit_date,
             monthly_quota, monthly_quota_used, user_type, vip_level, level, exp, status,
             continuous_sign_days, invite_code, invited_by, profile_completed)
-        VALUES (#{username}, #{password}, #{nickname}, #{avatar}, #{email}, #{phoneVerified},
+        VALUES (#{username}, #{password}, #{nickname}, #{avatar}, #{email}, #{emailVerified}, #{phoneVerified},
             #{realNameVerified}, #{points}, #{totalPoints}, #{freeQuota}, #{freeQuotaTotal},
             #{dailyLimit}, #{dailyUsed}, #{dailyLimitDate},
             #{monthlyQuota}, #{monthlyQuotaUsed}, #{userType}, #{vipLevel}, #{level}, #{exp}, #{status},

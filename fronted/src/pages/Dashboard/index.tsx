@@ -27,9 +27,19 @@ import {
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import type { MenuProps } from 'antd';
 import dayjs from 'dayjs';
+import { sendEmailVerifyCode, sendPhoneVerifyCode } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
-import { claimGrowthReward, completeProfileTask, getGrowthTasks } from '../../api/user';
-import type { GrowthTask } from '../../api/user';
+import {
+  bindEmailTask,
+  bindPhoneTask,
+  claimGrowthReward,
+  completeProfileTask,
+  getGrowthTasks,
+  verifyRealNameTask,
+} from '../../api/user';
+import type { GrowthTask, GrowthTaskAction } from '../../api/user';
+import { getHotImageNotifications, claimHotImageReward } from '../../api/image';
+import type { HotImageNotification } from '../../api/image';
 import logoSvg from '../../assets/ip.svg';
 import './index.css';
 
@@ -40,20 +50,39 @@ type GrowthTaskListPayload = {
   tasks?: GrowthTask[];
 };
 
+type TaskViewMode = 'pending' | 'history';
+
+type TaskModalAction = Exclude<GrowthTaskAction, 'CLAIM' | 'NONE'>;
+type TaskFormValues = {
+  nickname?: string;
+  avatar?: string;
+  email?: string;
+  emailCode?: string;
+  phone?: string;
+  phoneCode?: string;
+  realName?: string;
+  idCard?: string;
+};
+
 const Dashboard: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [activeTaskAction, setActiveTaskAction] = useState<TaskModalAction | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
   const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [taskCodeSending, setTaskCodeSending] = useState<'email' | 'phone' | null>(null);
+  const [emailCodeCountdown, setEmailCodeCountdown] = useState(0);
+  const [phoneCodeCountdown, setPhoneCodeCountdown] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
   const [growthTasks, setGrowthTasks] = useState<GrowthTask[]>([]);
+  const [taskViewMode, setTaskViewMode] = useState<TaskViewMode>('pending');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark';
   });
-  const [profileForm] = Form.useForm<{ nickname: string; avatar: string }>();
+  const [profileForm] = Form.useForm<TaskFormValues>();
   const { currentUser, logout: authLogout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -72,6 +101,26 @@ const Dashboard: React.FC = () => {
     };
   }, [theme]);
 
+  useEffect(() => {
+    if (emailCodeCountdown <= 0) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setEmailCodeCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [emailCodeCountdown]);
+
+  useEffect(() => {
+    if (phoneCodeCountdown <= 0) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setPhoneCodeCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [phoneCodeCountdown]);
+
   const loadGrowthTasks = useCallback(async (silent: boolean = true) => {
     if (!localStorage.getItem('token')) {
       setPendingCount(0);
@@ -81,17 +130,49 @@ const Dashboard: React.FC = () => {
 
     setTaskLoading(true);
     try {
-      const res = await getGrowthTasks() as unknown as {
-        code: number;
-        message?: string;
-        data?: GrowthTaskListPayload;
-      };
+      const [growthRes, hotRes] = await Promise.all([
+        getGrowthTasks() as unknown as {
+          code: number;
+          message?: string;
+          data?: GrowthTaskListPayload;
+        },
+        getHotImageNotifications().then(r => r as unknown as {
+          code: number;
+          data?: HotImageNotification[];
+        }).catch(() => ({ code: 0, data: [] as HotImageNotification[] })),
+      ]);
 
-      if (res.code === 200 && res.data) {
-        setPendingCount(res.data.pendingCount || 0);
-        setGrowthTasks(res.data.tasks || []);
-      } else if (!silent) {
-        message.error(res.message || '获取通知失败');
+      let tasks: GrowthTask[] = [];
+      let pending = 0;
+
+      if (growthRes.code === 200 && growthRes.data) {
+        pending = growthRes.data.pendingCount || 0;
+        tasks = growthRes.data.tasks || [];
+      }
+
+      // 将热门图片通知转为 GrowthTask 兼容格式合并
+      if (hotRes.code === 200 && hotRes.data && hotRes.data.length > 0) {
+        const hotTasks: GrowthTask[] = hotRes.data.map((n: HotImageNotification) => ({
+          recordId: n.hotImageId,
+          activityCode: `hot_image_${n.hotImageId}`,
+          title: n.title,
+          description: n.description,
+          triggerType: 'hot_image',
+          status: n.status === 'CLAIMABLE' ? 'CLAIMABLE' : ('REJECTED' as GrowthTask['status']),
+          actionType: (n.actionType === 'CLAIM_HOT' ? 'CLAIM_HOT' : 'NONE') as GrowthTask['actionType'],
+          rewardSummary: n.rewardSummary,
+          createdAt: n.createdAt,
+        }));
+        const hotPending = hotTasks.filter(t => t.status === 'CLAIMABLE').length;
+        pending += hotPending;
+        tasks = [...tasks, ...hotTasks];
+      }
+
+      setPendingCount(pending);
+      setGrowthTasks(tasks);
+
+      if (growthRes.code !== 200 && !silent) {
+        message.error(growthRes.message || '获取通知失败');
       }
     } catch (error: unknown) {
       if (!silent) {
@@ -174,21 +255,64 @@ const Dashboard: React.FC = () => {
   };
 
   const openTaskDrawer = () => {
+    setTaskViewMode('pending');
     setTaskDrawerOpen(true);
     loadGrowthTasks(false);
   };
+  const pendingTasks = growthTasks.filter((task) => task.status !== 'CLAIMED');
+  const historyTasks = growthTasks.filter((task) => task.status === 'CLAIMED');
+  const visibleGrowthTasks = taskViewMode === 'history' ? historyTasks : pendingTasks;
 
-  const openProfileRewardModal = () => {
+  const openTaskModal = (actionType: TaskModalAction) => {
+    setActiveTaskAction(actionType);
     profileForm.setFieldsValue({
       nickname: currentUser?.nickname || currentUser?.username || '',
       avatar: currentUser?.avatar || '',
+      email: currentUser?.email || '',
+      emailCode: '',
+      phone: currentUser?.phone || '',
+      phoneCode: '',
+      realName: currentUser?.realName || '',
+      idCard: '',
     });
+    setEmailCodeCountdown(0);
+    setPhoneCodeCountdown(0);
     setProfileModalOpen(true);
   };
 
   const handleTaskAction = async (task: GrowthTask) => {
-    if (task.actionType === 'COMPLETE_PROFILE') {
-      openProfileRewardModal();
+    if (
+      task.actionType === 'COMPLETE_PROFILE'
+      || task.actionType === 'BIND_EMAIL'
+      || task.actionType === 'BIND_PHONE'
+      || task.actionType === 'VERIFY_REAL_NAME'
+    ) {
+      openTaskModal(task.actionType as TaskModalAction);
+      return;
+    }
+
+    // 热门图片领取奖励
+    if (task.actionType === 'CLAIM_HOT' && task.recordId) {
+      setActionLoadingId(task.recordId);
+      try {
+        const res = await claimHotImageReward(task.recordId) as unknown as {
+          code: number;
+          message?: string;
+          data?: { pointsAdded?: number };
+        };
+        if (res.code !== 200) {
+          message.error(res.message || '领取失败');
+          return;
+        }
+        const pts = res.data?.pointsAdded;
+        message.success(pts ? `领取成功 +${pts}积分` : '奖励领取成功');
+        await Promise.all([loadGrowthTasks(), refreshUser()]);
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } } };
+        message.error(err.response?.data?.message || '领取失败，请稍后重试');
+      } finally {
+        setActionLoadingId(null);
+      }
       return;
     }
 
@@ -234,7 +358,33 @@ const Dashboard: React.FC = () => {
     try {
       const values = await profileForm.validateFields();
       setProfileSubmitting(true);
-      const res = await completeProfileTask(values) as unknown as {
+      let request: Promise<unknown>;
+      if (activeTaskAction === 'COMPLETE_PROFILE') {
+        request = completeProfileTask({
+          nickname: values.nickname || '',
+          avatar: values.avatar || '',
+        });
+      } else if (activeTaskAction === 'BIND_EMAIL') {
+        request = bindEmailTask({
+          email: values.email || '',
+          code: values.emailCode || '',
+        });
+      } else if (activeTaskAction === 'BIND_PHONE') {
+        request = bindPhoneTask({
+          phone: values.phone || '',
+          code: values.phoneCode || '',
+        });
+      } else if (activeTaskAction === 'VERIFY_REAL_NAME') {
+        request = verifyRealNameTask({
+          realName: values.realName || '',
+          idCard: values.idCard || '',
+        });
+      } else {
+        message.error('未知的任务类型');
+        return;
+      }
+
+      const res = await request as unknown as {
         code: number;
         message?: string;
         data?: {
@@ -243,19 +393,20 @@ const Dashboard: React.FC = () => {
       };
 
       if (res.code !== 200) {
-        message.error(res.message || '保存资料失败');
+        message.error(res.message || '任务提交失败');
         return;
       }
 
-      message.success(res.data?.message || res.message || '资料已完善，请在通知中领取奖励');
+      message.success(res.data?.message || res.message || '任务已完成，请在通知中领取奖励');
       setProfileModalOpen(false);
+      setActiveTaskAction(null);
       await Promise.all([loadGrowthTasks(), refreshUser()]);
     } catch (error: unknown) {
       const formError = error as { errorFields?: Array<unknown>; response?: { data?: { message?: string } } };
       if (formError.errorFields) {
         return;
       }
-      message.error(formError.response?.data?.message || '保存资料失败，请稍后重试');
+      message.error(formError.response?.data?.message || '任务提交失败，请稍后重试');
     } finally {
       setProfileSubmitting(false);
     }
@@ -268,6 +419,9 @@ const Dashboard: React.FC = () => {
     if (task.status === 'ACTION_REQUIRED') {
       return '待完成';
     }
+    if ((task.status as string) === 'REJECTED') {
+      return '未通过';
+    }
     return '已领取';
   };
 
@@ -277,6 +431,230 @@ const Dashboard: React.FC = () => {
       return '';
     }
     return dayjs(time).format('YYYY-MM-DD HH:mm');
+  };
+
+  const getTaskActionRequiredTip = (task: GrowthTask) => {
+    if (task.actionType === 'BIND_EMAIL') {
+      return '绑定邮箱后可用于找回密码，完成后即可领取奖励。';
+    }
+    if (task.actionType === 'BIND_PHONE') {
+      return '绑定手机号后可增强账号安全，完成后即可领取奖励。';
+    }
+    if (task.actionType === 'VERIFY_REAL_NAME') {
+      return '完成实名认证后可提升合规与风控能力，完成后即可领取奖励。';
+    }
+    return '先完善基础资料，完成后会变成可领取状态。';
+  };
+
+  const getTaskActionButtonText = (task: GrowthTask) => {
+    if (task.status === 'CLAIMED') {
+      return '已领取';
+    }
+    if ((task.status as string) === 'REJECTED') {
+      return '未通过';
+    }
+    if (task.status === 'CLAIMABLE') {
+      return task.actionType === 'CLAIM_HOT' ? '领取积分' : '领取奖励';
+    }
+    if (task.actionType === 'BIND_EMAIL' || task.actionType === 'BIND_PHONE') {
+      return '去绑定';
+    }
+    if (task.actionType === 'VERIFY_REAL_NAME') {
+      return '去认证';
+    }
+    return '去完善';
+  };
+
+  const getTaskModalTitle = () => {
+    if (activeTaskAction === 'BIND_EMAIL') {
+      return '绑定邮箱';
+    }
+    if (activeTaskAction === 'BIND_PHONE') {
+      return '绑定手机号';
+    }
+    if (activeTaskAction === 'VERIFY_REAL_NAME') {
+      return '实名认证';
+    }
+    return '完善基础资料';
+  };
+
+  const getTaskModalTip = () => {
+    if (activeTaskAction === 'BIND_EMAIL') {
+      return '邮箱将用于密码找回与安全通知，请先获取验证码，保存后会在通知中心生成待领取奖励。';
+    }
+    if (activeTaskAction === 'BIND_PHONE') {
+      return '手机号将用于账号找回与风险校验，请先获取验证码，保存后会在通知中心生成待领取奖励。';
+    }
+    if (activeTaskAction === 'VERIFY_REAL_NAME') {
+      return '实名认证用于平台合规和非法内容风控，完成后会在通知中心生成待领取奖励。';
+    }
+    return '保存后会在通知中心生成“完善资料奖励”，需要你再手动领取。';
+  };
+
+  const getTaskModalOkText = () => {
+    if (activeTaskAction === 'VERIFY_REAL_NAME') {
+      return '提交认证并生成奖励';
+    }
+    return '保存并生成奖励';
+  };
+
+  const handleSendTaskCode = async (targetType: 'email' | 'phone') => {
+    try {
+      if (targetType === 'email') {
+        const email = await profileForm.validateFields(['email']).then(() => profileForm.getFieldValue('email') as string);
+        setTaskCodeSending('email');
+        await sendEmailVerifyCode(email, 'bind_email');
+        message.success('邮箱验证码已发送，请查收邮箱');
+        setEmailCodeCountdown(60);
+        return;
+      }
+
+      const phone = await profileForm.validateFields(['phone']).then(() => profileForm.getFieldValue('phone') as string);
+      setTaskCodeSending('phone');
+      await sendPhoneVerifyCode(phone, 'bind_phone');
+      message.success('手机验证码已发送，请查看后端终端输出');
+      setPhoneCodeCountdown(60);
+    } catch (error: unknown) {
+      const formError = error as { errorFields?: Array<unknown>; response?: { data?: { message?: string } } };
+      if (formError.errorFields) {
+        return;
+      }
+      message.error(formError.response?.data?.message || '发送失败，请稍后重试');
+    } finally {
+      setTaskCodeSending(null);
+    }
+  };
+
+  const renderTaskFormItems = () => {
+    if (activeTaskAction === 'BIND_EMAIL') {
+      return (
+        <>
+          <Form.Item
+            name="email"
+            label="邮箱地址"
+            rules={[
+              { required: true, message: '请输入邮箱地址' },
+              { type: 'email', message: '请输入有效的邮箱地址' },
+            ]}
+          >
+            <Input placeholder="请输入常用邮箱" />
+          </Form.Item>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <Form.Item
+              name="emailCode"
+              label="邮箱验证码"
+              rules={[
+                { required: true, message: '请输入邮箱验证码' },
+                { pattern: /^\d{6}$/, message: '请输入6位邮箱验证码' },
+              ]}
+              style={{ flex: 1, marginBottom: 0 }}
+            >
+              <Input placeholder="请输入邮箱验证码" maxLength={6} />
+            </Form.Item>
+            <Button
+              htmlType="button"
+              style={{ marginTop: 30, minWidth: 132 }}
+              disabled={emailCodeCountdown > 0}
+              loading={taskCodeSending === 'email'}
+              onClick={() => handleSendTaskCode('email')}
+            >
+              {emailCodeCountdown > 0 ? `${emailCodeCountdown}s 后重发` : '发送验证码'}
+            </Button>
+          </div>
+        </>
+      );
+    }
+
+    if (activeTaskAction === 'BIND_PHONE') {
+      return (
+        <>
+          <Form.Item
+            name="phone"
+            label="手机号"
+            rules={[
+              { required: true, message: '请输入手机号' },
+              { pattern: /^1\d{10}$/, message: '请输入正确的手机号' },
+            ]}
+          >
+            <Input placeholder="请输入常用手机号" maxLength={11} />
+          </Form.Item>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <Form.Item
+              name="phoneCode"
+              label="手机验证码"
+              rules={[
+                { required: true, message: '请输入手机验证码' },
+                { pattern: /^\d{6}$/, message: '请输入6位手机验证码' },
+              ]}
+              style={{ flex: 1, marginBottom: 0 }}
+            >
+              <Input placeholder="请输入手机验证码" maxLength={6} />
+            </Form.Item>
+            <Button
+              htmlType="button"
+              style={{ marginTop: 30, minWidth: 132 }}
+              disabled={phoneCodeCountdown > 0}
+              loading={taskCodeSending === 'phone'}
+              onClick={() => handleSendTaskCode('phone')}
+            >
+              {phoneCodeCountdown > 0 ? `${phoneCodeCountdown}s 后重发` : '发送验证码'}
+            </Button>
+          </div>
+        </>
+      );
+    }
+
+    if (activeTaskAction === 'VERIFY_REAL_NAME') {
+      return (
+        <>
+          <Form.Item
+            name="realName"
+            label="真实姓名"
+            rules={[
+              { required: true, message: '请输入真实姓名' },
+              { max: 30, message: '真实姓名最多 30 个字符' },
+            ]}
+          >
+            <Input placeholder="请输入真实姓名" maxLength={30} />
+          </Form.Item>
+          <Form.Item
+            name="idCard"
+            label="身份证号"
+            rules={[
+              { required: true, message: '请输入身份证号' },
+              { pattern: /^(\d{15}|\d{17}[\dXx])$/, message: '请输入正确的身份证号' },
+            ]}
+          >
+            <Input placeholder="请输入身份证号" maxLength={18} />
+          </Form.Item>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <Form.Item
+          name="nickname"
+          label="昵称"
+          rules={[
+            { required: true, message: '请输入昵称' },
+            { max: 20, message: '昵称最多 20 个字符' },
+          ]}
+        >
+          <Input placeholder="请输入新的昵称" maxLength={20} />
+        </Form.Item>
+        <Form.Item
+          name="avatar"
+          label="头像地址"
+          rules={[
+            { required: true, message: '请输入头像地址' },
+            { type: 'url', message: '请输入有效的图片 URL' },
+          ]}
+        >
+          <Input placeholder="请输入头像图片 URL" />
+        </Form.Item>
+      </>
+    );
   };
 
   // 用户弹出面板内容
@@ -411,7 +789,11 @@ const Dashboard: React.FC = () => {
             {!collapsed && <span className="logo-text">Pixel</span>}
           </div>
           <div className="logo-actions">
-            <Badge dot={pendingCount > 0} offset={[-2, 4]}>
+            <Badge
+              dot={pendingCount > 0}
+              offset={collapsed ? [2, 6] : [-2, 4]}
+              className={`notification-badge ${collapsed ? 'collapsed' : ''}`}
+            >
               <div className="notification-trigger" onClick={openTaskDrawer}>
                 <BellOutlined />
               </div>
@@ -544,21 +926,44 @@ const Dashboard: React.FC = () => {
       >
         <div className="notification-summary">
           <div className="notification-summary-main">
-            <span className="notification-summary-label">待处理任务</span>
-            <span className="notification-summary-value">{pendingCount}</span>
+            <span className="notification-summary-label">
+              {taskViewMode === 'history' ? '历史任务' : '待处理任务'}
+            </span>
+            <span className="notification-summary-value">
+              {taskViewMode === 'history' ? historyTasks.length : pendingCount}
+            </span>
           </div>
           <div className="notification-summary-tip">
-            注册礼包、完善资料等奖励会先进入这里，需要你手动领取。
+            {taskViewMode === 'history'
+              ? '这里会展示你已经完成或已领取过的成长任务记录。'
+              : '注册礼包、账号完善与合规任务奖励会先进入这里，需要你手动领取。'}
           </div>
+        </div>
+
+        <div className="notification-view-switch">
+          <button
+            type="button"
+            className={`notification-view-btn ${taskViewMode === 'pending' ? 'active' : ''}`}
+            onClick={() => setTaskViewMode('pending')}
+          >
+            待处理
+          </button>
+          <button
+            type="button"
+            className={`notification-view-btn ${taskViewMode === 'history' ? 'active' : ''}`}
+            onClick={() => setTaskViewMode('history')}
+          >
+            历史任务
+          </button>
         </div>
 
         {taskLoading ? (
           <div className="notification-loading">
             <Spin size="large" />
           </div>
-        ) : growthTasks.length > 0 ? (
+        ) : visibleGrowthTasks.length > 0 ? (
           <div className="notification-task-list">
-            {growthTasks.map((task) => (
+            {visibleGrowthTasks.map((task) => (
               <div className="notification-task-card" key={`${task.activityCode}-${task.recordId || 'action'}`}>
                 <div className="notification-task-header">
                   <div>
@@ -582,20 +987,17 @@ const Dashboard: React.FC = () => {
                       ? '奖励已到账，可继续完成其他任务。'
                       : task.status === 'CLAIMABLE'
                         ? '点击右侧按钮后立即到账。'
-                        : '先完善资料，完成后会变成可领取状态。'}
+                        : getTaskActionRequiredTip(task)}
                   </span>
                   <Button
                     type={task.status === 'CLAIMABLE' ? 'primary' : 'default'}
                     ghost={task.status !== 'CLAIMABLE'}
-                    disabled={task.status === 'CLAIMED'}
+                    className={`notification-task-action ${task.status.toLowerCase()}`}
+                    disabled={task.status === 'CLAIMED' || (task.status as string) === 'REJECTED'}
                     loading={task.recordId ? actionLoadingId === task.recordId : false}
                     onClick={() => handleTaskAction(task)}
                   >
-                    {task.status === 'CLAIMED'
-                      ? '已领取'
-                      : task.actionType === 'COMPLETE_PROFILE'
-                        ? '去完善'
-                        : '领取奖励'}
+                    {getTaskActionButtonText(task)}
                   </Button>
                 </div>
               </div>
@@ -603,46 +1005,33 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           <div className="notification-empty">
-            <Empty description="暂无待处理通知" />
+            <Empty description={taskViewMode === 'history' ? '暂无历史任务' : '暂无待处理通知'} />
           </div>
         )}
       </Drawer>
 
       <Modal
-        title="完善个人信息"
+        title={getTaskModalTitle()}
         open={profileModalOpen}
-        onCancel={() => setProfileModalOpen(false)}
+        onCancel={() => {
+          setProfileModalOpen(false);
+          setActiveTaskAction(null);
+          setTaskCodeSending(null);
+          setEmailCodeCountdown(0);
+          setPhoneCodeCountdown(0);
+        }}
         onOk={handleProfileSubmit}
-        okText="保存并生成奖励"
+        okText={getTaskModalOkText()}
         cancelText="取消"
         confirmLoading={profileSubmitting}
         rootClassName="profile-reward-modal"
         wrapClassName="profile-reward-modal-wrap"
       >
         <Form form={profileForm} layout="vertical">
-          <Form.Item
-            name="nickname"
-            label="昵称"
-            rules={[
-              { required: true, message: '请输入昵称' },
-              { max: 20, message: '昵称最多 20 个字符' },
-            ]}
-          >
-            <Input placeholder="请输入新的昵称" maxLength={20} />
-          </Form.Item>
-          <Form.Item
-            name="avatar"
-            label="头像地址"
-            rules={[
-              { required: true, message: '请输入头像地址' },
-              { type: 'url', message: '请输入有效的图片 URL' },
-            ]}
-          >
-            <Input placeholder="请输入头像图片 URL" />
-          </Form.Item>
+          {renderTaskFormItems()}
         </Form>
         <div className="profile-reward-tip">
-          保存后会在通知中心生成“完善资料奖励”，需要你再手动领取，链路更清晰也更方便扩展活动。
+          {getTaskModalTip()}
         </div>
       </Modal>
     </Layout>

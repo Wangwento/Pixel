@@ -1,7 +1,14 @@
 import api from './index';
 
-export type GrowthTaskStatus = 'ACTION_REQUIRED' | 'CLAIMABLE' | 'CLAIMED';
-export type GrowthTaskAction = 'COMPLETE_PROFILE' | 'CLAIM' | 'NONE';
+export type GrowthTaskStatus = 'ACTION_REQUIRED' | 'CLAIMABLE' | 'CLAIMED' | 'REJECTED';
+export type GrowthTaskAction =
+  | 'COMPLETE_PROFILE'
+  | 'BIND_EMAIL'
+  | 'BIND_PHONE'
+  | 'VERIFY_REAL_NAME'
+  | 'CLAIM'
+  | 'CLAIM_HOT'
+  | 'NONE';
 
 export type GrowthTask = {
   recordId?: number;
@@ -26,4 +33,16 @@ export const claimGrowthReward = (recordId: number) => {
 
 export const completeProfileTask = (params: { nickname: string; avatar: string }) => {
   return api.post('/user/profile/complete', params);
+};
+
+export const bindEmailTask = (params: { email: string; code: string }) => {
+  return api.post('/user/profile/bind-email', params);
+};
+
+export const bindPhoneTask = (params: { phone: string; code: string }) => {
+  return api.post('/user/profile/bind-phone', params);
+};
+
+export const verifyRealNameTask = (params: { realName: string; idCard: string }) => {
+  return api.post('/user/profile/verify-real-name', params);
 };

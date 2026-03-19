@@ -1,5 +1,7 @@
 package com.wwt.pixel.image.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wwt.pixel.common.dto.Result;
 import com.wwt.pixel.common.exception.BusinessException;
 import com.wwt.pixel.image.ai.MultiVendorImageService;
@@ -10,6 +12,7 @@ import com.wwt.pixel.image.feign.UserServiceClient;
 import com.wwt.pixel.image.service.AvatarGenerationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +22,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 头像生成控制器
@@ -33,6 +38,7 @@ public class AvatarController {
     private final AvatarGenerationService avatarGenerationService;
     private final MultiVendorImageService multiVendorImageService;
     private final UserServiceClient userServiceClient;
+    private final ObjectMapper objectMapper;
 
     /**
      * 获取可用模型列表（根据用户VIP等级标记可用性）
@@ -62,7 +68,7 @@ public class AvatarController {
 
         GenerationResult result = avatarGenerationService.generateAvatar(
                 userId, request.getPrompt(), request.getStyle(), request.getModelId(),
-                request.getAspectRatio(), request.getImageSize());
+                request.getAspectRatio(), request.getImageSize(), request.getParams());
         return Result.success(toGenerationResponse(result));
     }
 
@@ -78,11 +84,15 @@ public class AvatarController {
             @RequestParam(value = "responseFormat", required = false) String responseFormat,
             @RequestParam(value = "aspectRatio", required = false) String aspectRatio,
             @RequestParam(value = "imageSize", required = false) String imageSize,
+            @RequestParam(value = "params", required = false) String paramsJson,
             @RequestParam(value = "image", required = false) List<MultipartFile> images,
             @RequestParam(value = "imageUrl", required = false) List<String> imageUrls) {
 
         if (prompt == null || prompt.isBlank()) {
             throw new BusinessException("描述不能为空");
+        }
+        if (prompt.length() > 5000) {
+            throw new BusinessException("描述最长5000字符");
         }
         int imageCount = (images == null ? 0 : images.size()) + (imageUrls == null ? 0 : imageUrls.size());
         if (imageCount == 0) {
@@ -101,8 +111,25 @@ public class AvatarController {
                 imageUrls == null ? Collections.emptyList() : imageUrls,
                 responseFormat,
                 aspectRatio,
-                imageSize);
+                imageSize,
+                parseParams(paramsJson));
         return Result.success(toGenerationResponse(result));
+    }
+
+    private Map<String, Object> parseParams(String paramsJson) {
+        if (paramsJson == null || paramsJson.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(
+                    paramsJson,
+                    new TypeReference<LinkedHashMap<String, Object>>() {
+                    }
+            );
+            return parsed == null ? Collections.emptyMap() : parsed;
+        } catch (Exception e) {
+            throw new BusinessException("参数格式错误: params 必须是合法 JSON");
+        }
     }
 
     private GenerationResponse toGenerationResponse(GenerationResult result) {
@@ -118,10 +145,12 @@ public class AvatarController {
     @Data
     public static class Text2ImgRequest {
         @NotBlank(message = "描述不能为空")
+        @Size(max = 5000, message = "描述最长5000字符")
         private String prompt;
         private String style;
         private String modelId;
         private String aspectRatio;
         private String imageSize;
+        private Map<String, Object> params;
     }
 }

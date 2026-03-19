@@ -2,7 +2,10 @@ package com.wwt.pixel.user.service;
 
 import com.wwt.pixel.common.constant.CommonConstant;
 import com.wwt.pixel.common.exception.BusinessException;
+import com.wwt.pixel.user.domain.PointsRecord;
 import com.wwt.pixel.user.domain.User;
+import com.wwt.pixel.user.domain.UserBasicInfo;
+import com.wwt.pixel.user.mapper.PointsRecordMapper;
 import com.wwt.pixel.user.mapper.UserMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 用户服务
@@ -21,9 +26,24 @@ import java.time.LocalDate;
 public class UserService {
 
     private final UserMapper userMapper;
+    private final PointsRecordMapper pointsRecordMapper;
 
     public User findById(Long id) {
         return userMapper.findById(id);
+    }
+
+    public List<UserBasicInfo> listBasicInfoByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> normalizedIds = userIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (normalizedIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return userMapper.findBasicInfoByIds(normalizedIds);
     }
 
     /**
@@ -181,6 +201,32 @@ public class UserService {
             user.setDailyUsed(user.getDailyUsed() - 1);
         }
         throw new BusinessException("额度不足");
+    }
+
+    /**
+     * 内部加积分 (供其他服务通过Feign调用)
+     * type=13 表示热门奖励
+     */
+    @Transactional
+    public void addPointsInternal(Long userId, int points, String source, String description) {
+        if (points <= 0) {
+            throw new BusinessException("积分数量必须大于0");
+        }
+        User user = userMapper.findByIdForUpdate(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        user.addPoints(points);
+        userMapper.updatePoints(userId, user.getPoints(), user.getTotalPoints());
+        pointsRecordMapper.insert(PointsRecord.builder()
+                .userId(userId)
+                .points(points)
+                .balance(user.getPoints())
+                .type(13) // 热门奖励
+                .source(source)
+                .description(description)
+                .build());
+        log.info("内部加积分: userId={}, points={}, source={}", userId, points, source);
     }
 
     /**

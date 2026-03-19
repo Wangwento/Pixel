@@ -85,8 +85,9 @@ const LoginModal: React.FC<LoginModalProps> = ({
           return prev - 1;
         });
       }, 1000);
-    } catch {
-      message.error('发送失败，请重试');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || '发送失败，请重试');
     }
   };
 
